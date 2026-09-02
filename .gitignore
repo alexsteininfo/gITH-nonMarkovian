@@ -4,6 +4,8 @@ data/
 
 # Local-only project notes for Claude Code.
 CLAUDE.md
+.claude
+docs/
 
 # Other
 .DS_Store
