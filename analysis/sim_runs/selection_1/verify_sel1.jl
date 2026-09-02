@@ -63,4 +63,49 @@ end
     end
 end
 
+@testset "driver injection mechanics" begin
+    birth = f -> Gamma(5.0, 1.0 / (5.0 * f))
+    death = _ -> Gamma(5.0, 1.0 / (5.0 * 0.5))
+
+    r = run_sel1_once(birth, death, 1_000, 1.0, 100, MersenneTwister(1))
+    @test r.injected
+    @test r.N_at_inject == 101            # hook sees popsize == N_critic + 1
+    @test popsize(r.pop) >= 1_000
+    @test r.driver_cell_id > 0
+
+    # The boosted cells are exactly the alive leaves under the injected node —
+    # one clade, no leakage into unrelated lineages.
+    clone = count(>(1.0), fitness_per_cell(r.pop))
+    @test clone > 0
+    @test length(collect(Leaves(r.driver_node))) == clone
+end
+
+@testset "boosted cell divides at the boosted rate" begin
+    # With Dirac timing a cell of fitness f has lifetime exactly 1/f. This is the
+    # test that catches an injection applied after the daughter was scheduled:
+    # that ordering would leave the driver's OWN first division at 1/1 = 1.0 and
+    # only speed up its descendants.
+    s = 1.0
+    r = run_sel1_once(f -> Dirac(1.0 / f), _ -> Dirac(1e8), 8, s, 1,
+                      MersenneTwister(2); nu = 0.0)
+    @test r.injected
+    @test celllifetime(r.driver_node) ≈ 1.0 / (1.0 + s)
+end
+
+@testset "s = 0 injection does not perturb the rng stream" begin
+    # N_critic = 0 can never fire, because popsize inside the hook is always >= 2.
+    # So this compares an s=0 injection against an identical un-hooked run.
+    birth = f -> Gamma(5.0, 1.0 / (5.0 * f))
+    death = _ -> Gamma(5.0, 1.0 / (5.0 * 0.5))
+    a = run_sel1_once(birth, death, 500, 0.0, 50, MersenneTwister(99))
+    b = run_sel1_once(birth, death, 500, 0.0,  0, MersenneTwister(99))
+
+    @test a.injected
+    @test !b.injected
+    @test a.pop.t === b.pop.t
+    @test popsize(a.pop) == popsize(b.pop)
+    @test sort(mutations_per_cell(a.pop)) == sort(mutations_per_cell(b.pop))
+    @test all(f === 1.0 for f in fitness_per_cell(a.pop))
+end
+
 end
