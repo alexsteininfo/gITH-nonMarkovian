@@ -161,11 +161,18 @@ end
     @test mean_clone(1.0, 2) > mean_clone(1.0, 500)
 
     # Retries get rarer as the driver gets stronger (establishment is easier).
+    # Establishment rate is measured at d = 0.9, not at the d = 0.5 used above. At
+    # d = 0.5 the driver establishes easily for every s (mean attempts 1.1-1.5, against
+    # a floor of 1), so the comparison has almost no dynamic range and actually inverts
+    # at N_critic = 500. At d = 0.9 the same comparison spans 10.94 vs 4.76, a factor of
+    # 2.3. N_critic = 500 holds population-extinction risk constant between the two s
+    # values, so the comparison isolates driver establishment. Measured 2026-09-02.
+    death9 = _ -> Gamma(5.0, 1.0 / (5.0 * 0.9))
     mean_attempts(s) = mean(
-        run_sel1_accepted(birth, death,
-            Sel1Params(1.0, 0.5, 5.0, 2.0, 1_000, :gamma, s, 500, rep)
-        ).injection.n_attempts for rep in 1:10)
-    @test mean_attempts(2.0) <= mean_attempts(0.1)
+        run_sel1_accepted(birth, death9,
+            Sel1Params(1.0, 0.9, 5.0, 2.0, 1_000, :gamma, s, 500, rep)
+        ).injection.n_attempts for rep in 1:50)
+    @test mean_attempts(2.0) < mean_attempts(0.1)
 end
 
 end
