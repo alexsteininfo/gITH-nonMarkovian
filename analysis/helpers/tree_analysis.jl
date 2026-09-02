@@ -106,3 +106,19 @@ function compute_filtered_mut_per_cell(root::BinaryNode{NonMarkovCell},
     end
     return result
 end
+
+# ── Leaf fitness ───────────────────────────────────────────────────────────────
+# One fitness value per alive leaf. Iterates `getalivecells(root)`, which is
+# `Leaves(root)` filtered by `isalive` — the same traversal `mutations_per_cell`
+# uses — so `compute_leaf_fitness` and `compute_mut_per_cell` are co-indexed:
+# entry i is the same cell in both. `compute_leaf_depths` walks its own stack in a
+# different order and is *not* co-indexed with either; treat it as a pooled
+# distribution only.
+#
+# Fitness stays exactly 1.0 in the neutral runs. It matters for selection: in
+# scenario 1 `fitness > 1` labels the driver clone, in scenario 2 it is the
+# observable itself.
+
+function compute_leaf_fitness(root::BinaryNode{NonMarkovCell})
+    return [leaf.data.fitness for leaf in getalivecells(root)]
+end

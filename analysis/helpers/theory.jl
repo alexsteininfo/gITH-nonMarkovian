@@ -8,12 +8,12 @@ using Distributions
 # omega = 2*mu throughout, where mu is the per-division mutation rate.
 # The factor of 2 arises because the formula counts mutations on ALL branches
 # of the phylogenetic tree — both internal branches (shared mutations, k≥2) and
-# leaf branches (private mutations, k=1).  Our branch_spectrum stores only
-# internal nodes, so k=1 is absent from the empirical SFS; the theoretical
-# k=1 prediction represents private leaf-branch mutations.
+# leaf branches (private mutations, k=1).  compute_sfs fills sfs[1] from the
+# leaf branches too, so empirical and theoretical spectra are directly
+# comparable at every k, including k=1.
 #
-# Derivation: for d=0, E[bs[k]] ≈ 2N/(k(k+1)) empirically (factor-of-2 over
-# the formula's N/(k(k+1))), confirmed by pooling 200 simulations.
+# Derivation: for d=0, E[sfs[k]] ≈ 2·nu·N/(k(k+1)) empirically (factor-of-2
+# over the formula's N/(k(k+1))), confirmed by pooling 200 simulations.
 
 # SFS for a perfect binary tree (deterministic Dirac timing, N must be a power of 2).
 # At depth d from the root there are 2^d branches, each subtending N/2^d leaves.
