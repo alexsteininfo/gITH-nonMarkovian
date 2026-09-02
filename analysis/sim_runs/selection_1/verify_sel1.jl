@@ -164,7 +164,8 @@ end
     # Establishment rate is measured at d = 0.9, not at the d = 0.5 used above. At
     # d = 0.5 the driver establishes easily for every s (mean attempts 1.1-1.5, against
     # a floor of 1), so the comparison has almost no dynamic range and has no reliable
-    # direction at N_critic = 500 (measured 1.22 vs 1.16, well inside sampling noise).
+    # direction at N_critic = 500: it measured 1.22 vs 1.16 under one seed set and
+    # 1.2 vs 1.5 under another, i.e. it changes sign with the seeds.
     # At d = 0.9 the same comparison spans 9.26 vs 5.64, a factor of 1.64. N_critic = 500
     # holds population-extinction risk constant between the two s values, so the
     # comparison isolates driver establishment. Measured 2026-09-02.
