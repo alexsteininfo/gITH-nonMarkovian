@@ -99,3 +99,67 @@ function run_sel1_once(
         driver_node    = driver_node[],
     )
 end
+
+"""
+    sel1_seed(s, N_critic, rep, attempt) -> UInt64
+
+Deterministic per-attempt seed. Recorded on the accepted result so any single
+simulation can be reproduced in isolation without replaying the whole sweep.
+"""
+sel1_seed(s::Float64, N_critic::Int, rep::Int, attempt::Int) =
+    hash((:sel1, s, N_critic, rep, attempt))
+
+"""
+    run_sel1_accepted(birth_dist, death_dist, params; max_attempts = 10_000,
+                      trajectory_dt = 0.1) -> Sel1SimResult
+
+Retry `run_sel1_once` until a usable simulation is produced, and package it.
+
+A run is accepted only when all three hold:
+
+1. the population reached `N_target` (it did not go extinct);
+2. the driver was injected and its clone is still alive at `N_target`;
+3. `getsingleroot` found a unique root, so the tree is usable downstream.
+
+`restart_on_extinction` is deliberately not used: acceptance also depends on the
+driver's fate, and the `injected` flag in the hook's closure must be fresh for each
+attempt. Conditioning on population survival is equivalent in law to what the neutral
+runs get from `restart_on_extinction = true`.
+
+`n_attempts` is recorded, so `1 / mean(n_attempts)` over a cell estimates the joint
+probability of population survival and driver establishment — itself a result, since
+Gamma and exponential timing give different establishment probabilities.
+"""
+function run_sel1_accepted(
+    birth_dist,
+    death_dist,
+    params::Sel1Params;
+    max_attempts::Int = 10_000,
+    trajectory_dt::Float64 = 0.1,
+)
+    for attempt in 1:max_attempts
+        seed = sel1_seed(params.s, params.N_critic, params.rep, attempt)
+        r = run_sel1_once(birth_dist, death_dist, params.N_target, params.s,
+                          params.N_critic, MersenneTwister(seed);
+                          nu = params.nu, trajectory_dt = trajectory_dt)
+
+        popsize(r.pop) >= params.N_target || continue
+        r.injected                        || continue
+        clone = count(>(1.0), fitness_per_cell(r.pop))
+        clone > 0                         || continue
+        root = getsingleroot(allcells(r.pop))
+        isnothing(root)                   && continue
+
+        return Sel1SimResult(
+            r.trajectory,
+            root,
+            params,
+            Sel1Injection(r.t_inject, r.N_at_inject, r.driver_cell_id,
+                          clone, attempt, seed),
+        )
+    end
+
+    error("no accepted simulation after $max_attempts attempts for " *
+          "model=$(params.model) N_target=$(params.N_target) d=$(params.d) " *
+          "s=$(params.s) N_critic=$(params.N_critic) rep=$(params.rep)")
+end

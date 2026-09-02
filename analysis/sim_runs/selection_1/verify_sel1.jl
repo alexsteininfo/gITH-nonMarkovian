@@ -108,4 +108,42 @@ end
     @test all(f === 1.0 for f in fitness_per_cell(a.pop))
 end
 
+@testset "acceptance and retry" begin
+    birth   = f -> Gamma(5.0, 1.0 / (5.0 * f))
+    nodeath = _ -> Gamma(5.0, 1e8)
+    death9  = _ -> Gamma(5.0, 1.0 / (5.0 * 0.9))
+
+    # d = 0: no extinction, no driver loss, so the first attempt is always accepted.
+    p0 = Sel1Params(1.0, 0.0, 5.0, 2.0, 500, :gamma, 0.5, 50, 1)
+    r0 = run_sel1_accepted(birth, nodeath, p0)
+    @test r0 isa Sel1SimResult
+    @test r0.params == p0
+    @test r0.injection.n_attempts == 1
+    @test r0.injection.N_at_inject == 51
+    @test r0.injection.driver_clone_size > 0
+    @test !isnothing(r0.tree_root)
+    @test length(r0.trajectory) > 0
+
+    # d = 0.9: extinction and driver loss are both common, so retries must happen.
+    # Asserted over ten replicates rather than one, so the check is not a coin flip.
+    attempts = [run_sel1_accepted(birth, death9,
+                    Sel1Params(1.0, 0.9, 5.0, 2.0, 1_000, :gamma, 0.1, 500, rep)
+                ).injection.n_attempts for rep in 1:10]
+    @test all(>=(1), attempts)
+    @test sum(attempts) > 10
+
+    # An accepted result is reproducible on its own from its recorded seed.
+    r9 = run_sel1_accepted(birth, death9,
+             Sel1Params(1.0, 0.9, 5.0, 2.0, 1_000, :gamma, 0.1, 500, 1))
+    again = run_sel1_once(birth, death9, 1_000, 0.1, 500,
+                          MersenneTwister(r9.injection.seed))
+    @test count(>(1.0), fitness_per_cell(again.pop)) == r9.injection.driver_clone_size
+
+    # An unsatisfiable cell errors rather than returning junk: N_critic above
+    # N_target means the hook can never fire, so nothing is ever accepted.
+    p_bad = Sel1Params(1.0, 0.0, 5.0, 2.0, 500, :gamma, 0.5, 5_000, 1)
+    @test_throws ErrorException run_sel1_accepted(birth, nodeath, p_bad;
+                                                  max_attempts = 3)
+end
+
 end
