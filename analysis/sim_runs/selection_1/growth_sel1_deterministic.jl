@@ -36,6 +36,16 @@ for N_target in N_VALUES
     N_CRITIC   = ncritic_grid(N_target)
 
     for s in S_VALUES
+        # The sweep is resumable: a shard is skipped once its output file exists, so a
+        # crash mid-sweep restarts only from the first missing shard. Delete a shard's
+        # .jls file to force it to be regenerated.
+        outfile = joinpath(@__DIR__, "..", "..", "..", "data", "raw", "selection_1",
+                           "deterministic", "sel1_deterministic_N$(N_target)_s$(s).jls")
+        if isfile(outfile)
+            println("  → $(outfile) exists, skipping")
+            continue
+        end
+
         println("deterministic  N=$N_target  s=$s ...")
 
         cells   = [(nc, rep) for nc in N_CRITIC for rep in 1:N_REPS]
@@ -46,8 +56,6 @@ for N_target in N_VALUES
                 Sel1Params(b, 0.0, k, nu, N_target, :deterministic, s, nc, rep))
         end
 
-        outfile = joinpath(@__DIR__, "..", "..", "..", "data", "raw", "selection_1",
-                           "deterministic", "sel1_deterministic_N$(N_target)_s$(s).jls")
         mkpath(dirname(outfile))
         serialize(outfile, results)
         println("  → $(outfile)")

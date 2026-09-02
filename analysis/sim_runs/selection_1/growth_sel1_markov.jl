@@ -31,6 +31,16 @@ for N_target in N_VALUES, d in D_VALUES
     N_CRITIC   = ncritic_grid(N_target)
 
     for s in S_VALUES
+        # The sweep is resumable: a shard is skipped once its output file exists, so a
+        # crash mid-sweep restarts only from the first missing shard. Delete a shard's
+        # .jls file to force it to be regenerated.
+        outfile = joinpath(@__DIR__, "..", "..", "..", "data", "raw", "selection_1",
+                           "markov", "sel1_markov_N$(N_target)_d$(d)_s$(s).jls")
+        if isfile(outfile)
+            println("  → $(outfile) exists, skipping")
+            continue
+        end
+
         println("markov  N=$N_target  d=$d  s=$s ...")
 
         cells   = [(nc, rep) for nc in N_CRITIC for rep in 1:N_REPS]
@@ -41,8 +51,6 @@ for N_target in N_VALUES, d in D_VALUES
                 Sel1Params(b, d, k, nu, N_target, :markov, s, nc, rep))
         end
 
-        outfile = joinpath(@__DIR__, "..", "..", "..", "data", "raw", "selection_1",
-                           "markov", "sel1_markov_N$(N_target)_d$(d)_s$(s).jls")
         mkpath(dirname(outfile))
         serialize(outfile, results)
         println("  → $(outfile)  (mean attempts $(round(mean(r.injection.n_attempts for r in results), digits = 2)))")
