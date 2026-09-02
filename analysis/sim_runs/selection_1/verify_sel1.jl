@@ -146,4 +146,26 @@ end
                                                   max_attempts = 3)
 end
 
+@testset "clone size responds to s and to N_critic" begin
+    birth = f -> Gamma(5.0, 1.0 / (5.0 * f))
+    death = _ -> Gamma(5.0, 1.0 / (5.0 * 0.5))
+
+    mean_clone(s, nc) = mean(
+        run_sel1_accepted(birth, death,
+            Sel1Params(1.0, 0.5, 5.0, 2.0, 1_000, :gamma, s, nc, rep)
+        ).injection.driver_clone_size for rep in 1:5)
+
+    # A stronger driver sweeps further by the time the population reaches N_target.
+    @test mean_clone(2.0, 16) > mean_clone(0.1, 16)
+    # An earlier driver has more generations to expand in.
+    @test mean_clone(1.0, 2) > mean_clone(1.0, 500)
+
+    # Retries get rarer as the driver gets stronger (establishment is easier).
+    mean_attempts(s) = mean(
+        run_sel1_accepted(birth, death,
+            Sel1Params(1.0, 0.5, 5.0, 2.0, 1_000, :gamma, s, 500, rep)
+        ).injection.n_attempts for rep in 1:10)
+    @test mean_attempts(2.0) <= mean_attempts(0.1)
+end
+
 end
