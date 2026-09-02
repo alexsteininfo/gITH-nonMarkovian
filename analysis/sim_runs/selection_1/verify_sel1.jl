@@ -14,6 +14,7 @@ const HELPERS = joinpath(dirname(dirname(@__DIR__)), "helpers")
 
 include(joinpath(HELPERS, "types.jl"))
 include(joinpath(HELPERS, "types_selection1.jl"))
+include(joinpath(HELPERS, "selection1.jl"))
 
 @testset "selection scenario 1" begin
 
@@ -43,6 +44,22 @@ end
         @test sims[1].params.nu == 2.0
     else
         @info "skipping: $f not present"
+    end
+end
+
+@testset "ncritic_grid matches the spec table" begin
+    @test ncritic_grid(1_000)  == [1, 2, 4, 8, 16, 32, 63, 126, 251, 500]
+    @test ncritic_grid(10_000) == [1, 3, 7, 17, 44, 113, 292, 753, 1941, 5000]
+    @test ncritic_grid(1_024)  == [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    @test ncritic_grid(16_384) == [1, 3, 7, 20, 55, 149, 406, 1106, 3010, 8192]
+
+    for N in (1_000, 10_000, 1_024, 16_384)
+        g = ncritic_grid(N)
+        @test length(g) == 10          # no collisions after dedup
+        @test first(g) == 1
+        @test last(g)  == N ÷ 2
+        @test issorted(g)
+        @test allunique(g)
     end
 end
 
