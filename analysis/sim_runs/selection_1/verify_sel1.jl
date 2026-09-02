@@ -163,10 +163,11 @@ end
     # Retries get rarer as the driver gets stronger (establishment is easier).
     # Establishment rate is measured at d = 0.9, not at the d = 0.5 used above. At
     # d = 0.5 the driver establishes easily for every s (mean attempts 1.1-1.5, against
-    # a floor of 1), so the comparison has almost no dynamic range and actually inverts
-    # at N_critic = 500. At d = 0.9 the same comparison spans 10.94 vs 4.76, a factor of
-    # 2.3. N_critic = 500 holds population-extinction risk constant between the two s
-    # values, so the comparison isolates driver establishment. Measured 2026-09-02.
+    # a floor of 1), so the comparison has almost no dynamic range and has no reliable
+    # direction at N_critic = 500 (measured 1.22 vs 1.16, well inside sampling noise).
+    # At d = 0.9 the same comparison spans 9.26 vs 5.64, a factor of 1.64. N_critic = 500
+    # holds population-extinction risk constant between the two s values, so the
+    # comparison isolates driver establishment. Measured 2026-09-02.
     death9 = _ -> Gamma(5.0, 1.0 / (5.0 * 0.9))
     mean_attempts(s) = mean(
         run_sel1_accepted(birth, death9,

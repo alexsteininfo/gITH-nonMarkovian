@@ -101,13 +101,20 @@ function run_sel1_once(
 end
 
 """
-    sel1_seed(s, N_critic, rep, attempt) -> UInt64
+    sel1_seed(params, attempt) -> UInt64
 
-Deterministic per-attempt seed. Recorded on the accepted result so any single
-simulation can be reproduced in isolation without replaying the whole sweep.
+Deterministic per-attempt seed, recorded on the accepted result so any single
+simulation can be reproduced in isolation without replaying the sweep.
+
+Every field of the design point is hashed, not just `(s, N_critic, rep)`. Hashing a
+subset made parameter sets share rng streams: `N_critic = 1` is common to both
+`N_target` values in every model, so those runs were the same realization truncated, and
+because a Gamma of fixed shape consumes a fixed number of uniforms per draw, `d = 0.0`
+and `d = 0.5` stayed stream-locked until the first death fired, pairing the `d` axis
+instead of making it independent.
 """
-sel1_seed(s::Float64, N_critic::Int, rep::Int, attempt::Int) =
-    hash((:sel1, s, N_critic, rep, attempt))
+sel1_seed(p::Sel1Params, attempt::Int) =
+    hash((:sel1, p.model, p.N_target, p.d, p.gamma_shape, p.nu, p.s, p.N_critic, p.rep, attempt))
 
 """
     run_sel1_accepted(birth_dist, death_dist, params; max_attempts = 10_000,
@@ -138,7 +145,7 @@ function run_sel1_accepted(
     trajectory_dt::Float64 = 0.1,
 )
     for attempt in 1:max_attempts
-        seed = sel1_seed(params.s, params.N_critic, params.rep, attempt)
+        seed = sel1_seed(params, attempt)
         r = run_sel1_once(birth_dist, death_dist, params.N_target, params.s,
                           params.N_critic, MersenneTwister(seed);
                           nu = params.nu, trajectory_dt = trajectory_dt)
