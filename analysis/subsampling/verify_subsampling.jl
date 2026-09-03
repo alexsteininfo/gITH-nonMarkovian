@@ -329,6 +329,56 @@ end
             @test [r.sampled_ids for r in deserialize(f)] == first_ids   # same draws
             rm(out; recursive = true)
         end
+
+        @testset "subsample_file skips only the sizes already present, regenerating the rest" begin
+            out = mktempdir()
+            small = joinpath(out, "src")
+            mkpath(small)
+            serialize(joinpath(small, stem * ".jls"), sims[1:4])
+
+            subsample_file(joinpath(small, stem * ".jls"), out, [100, 50])
+            f100 = joinpath(out, stem * "_n100.jls")
+            f50  = joinpath(out, stem * "_n50.jls")
+            @test isfile(f100)
+            @test isfile(f50)
+            ids100_before = [r.sampled_ids for r in deserialize(f100)]
+            ids50_before  = [r.sampled_ids for r in deserialize(f50)]
+
+            rm(f50)
+            mtime100_before = mtime(f100)
+            subsample_file(joinpath(small, stem * ".jls"), out, [100, 50])   # only n=50 redone
+
+            @test mtime(f100) == mtime100_before                              # survivor untouched
+            @test [r.sampled_ids for r in deserialize(f100)] == ids100_before # survivor's content unchanged
+            @test isfile(f50)
+            @test [r.sampled_ids for r in deserialize(f50)] == ids50_before   # regenerated with same draws
+            rm(out; recursive = true)
+        end
+    end
+end
+
+@testset "subsample_shard filters synthetic nothing-tree holes, preserving order and co-indexing" begin
+    # The real shard used above is stipulated to have zero nothing-tree entries, so
+    # it can never exercise the nothing-skip / co-indexing branch of subsample_shard.
+    # Build a synthetic shard with real holes instead: nothing at the first, an
+    # interior, and the last position, with kept sims sandwiched between them and
+    # each carrying distinguishable params so the sim_index → params mapping is
+    # actually checked, not just the output length.
+    p(nu) = SimParams(1.0, 0.5, 5.0, nu, 0.0, 1_000, NaN)
+    sims_holes = GrowthSimResult[
+        GrowthSimResult(TrajectoryPoint[], nothing,       p(1.0)),  # 1: hole (first)
+        GrowthSimResult(TrajectoryPoint[], fixture_tree(), p(2.0)), # 2: kept
+        GrowthSimResult(TrajectoryPoint[], nothing,       p(3.0)),  # 3: hole (interior)
+        GrowthSimResult(TrajectoryPoint[], fixture_tree(), p(4.0)), # 4: kept
+        GrowthSimResult(TrajectoryPoint[], nothing,       p(5.0)),  # 5: hole (last)
+    ]
+
+    res = subsample_shard(sims_holes, "holes-stem", 2)
+    @test res isa Vector{SubsampleResult{SimParams}}
+    @test length(res) == 2
+    @test [r.sim_index for r in res] == [2, 4]          # ascending source order, holes removed
+    for r in res
+        @test r.params == sims_holes[r.sim_index].params   # mapped back to its own source sim
     end
 end
 
