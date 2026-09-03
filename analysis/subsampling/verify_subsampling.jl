@@ -191,4 +191,145 @@ end
     end
 end
 
+# ── Helpers: id-labelled reference values from a full tree ────────────────────
+# `compute_leaf_depths` returns an unlabelled vector in its own traversal order, so
+# comparing a subsample cell-by-cell needs id keys. `id_burden_map` reproduces
+# `mutations_per_cell`: it sums every ancestor's mutations including the root's.
+
+function id_depth_map(root::BinaryNode{NonMarkovCell})
+    m = Dict{Int64, Int}()
+    stack = Tuple{BinaryNode{NonMarkovCell}, Int}[(root, 0)]
+    while !isempty(stack)
+        node, d = pop!(stack)
+        if isnothing(node.left) && isnothing(node.right)
+            m[node.data.id] = d
+        else
+            isnothing(node.left)  || push!(stack, (node.left,  d + 1))
+            isnothing(node.right) || push!(stack, (node.right, d + 1))
+        end
+    end
+    return m
+end
+
+function id_burden_map(root::BinaryNode{NonMarkovCell})
+    m = Dict{Int64, Int}()
+    for leaf in Leaves(root)
+        muts = leaf.data.mutations
+        node = leaf
+        while !isnothing(node.parent)
+            node = node.parent
+            muts += node.data.mutations
+        end
+        m[leaf.data.id] = muts
+    end
+    return m
+end
+
+@testset "real shard against data/processed" begin
+    stem     = "neutral_gamma_N1000_d0.5_k5.0"
+    raw_path = joinpath(ROOT, "data", "raw", "neutral", "gamma", stem * ".jls")
+    proc_dir = joinpath(ROOT, "data", "processed", "neutral", "gamma")
+
+    if !isfile(raw_path) || !isdir(proc_dir)
+        @info "skipping real-shard tests: $raw_path or $proc_dir not present"
+    else
+        sims       = deserialize(raw_path)::Vector{GrowthSimResult}
+        ref_sfs    = deserialize(joinpath(proc_dir, "sfs",          stem * ".jls"))
+        ref_mpc    = deserialize(joinpath(proc_dir, "mut_per_cell", stem * ".jls"))
+        ref_depths = deserialize(joinpath(proc_dir, "leaf_depths",  stem * ".jls"))
+
+        # `process_neutral.jl` drops nothing-tree sims in source order; do the same
+        # so index i here is index i there.
+        kept = [i for i in eachindex(sims) if !isnothing(sims[i].tree_root)]
+        @test length(kept) == length(ref_sfs)
+
+        @testset "n = N_full reproduces the processed arrays exactly" begin
+            for j in 1:3
+                i    = kept[j]
+                root = sims[i].tree_root
+                sub, ids, N_full = subsample_tree(root, 1_000, UInt64(j))
+                @test N_full == 1_000
+                @test sort(ids) == sort([l.data.id for l in Leaves(root)])
+                @test compute_sfs(sub, N_full)  == ref_sfs[j]
+                @test compute_mut_per_cell(sub) == ref_mpc[j]
+                @test compute_leaf_depths(sub)  == ref_depths[j]
+            end
+        end
+
+        @testset "n = 100 leaves cell-level quantities unchanged" begin
+            for j in 1:3
+                i     = kept[j]
+                root  = sims[i].tree_root
+                depth = id_depth_map(root)
+                burden = id_burden_map(root)
+
+                sub, ids, N_full = subsample_tree(root, 100, sample_seed(stem, i, 100))
+                @test N_full == 1_000
+                @test length(ids) == 100
+                @test length(unique(ids)) == 100                  # without replacement
+
+                sub_ids = Int64[l.data.id for l in Leaves(sub)]
+                @test sort(sub_ids) == sort(ids)                  # leaves are the draw
+                @test all(haskey(depth, id) for id in sub_ids)    # drawn from this tree
+
+                # id-matched equality with the full tree, both quantities
+                @test id_depth_map(sub)  == Dict(id => depth[id]  for id in sub_ids)
+                @test id_burden_map(sub) == Dict(id => burden[id] for id in sub_ids)
+                @test compute_mut_per_cell(sub) == Int[burden[id] for id in sub_ids]
+
+                # SFS bookkeeping
+                sfs = compute_sfs(sub, 100)
+                @test length(sfs) == 100
+                @test sum(k * sfs[k] for k in 1:100) == sum(compute_mut_per_cell(sub))
+                @test sum(sfs) == sum(nd.data.mutations for nd in PreOrderDFS(sub))
+                @test sum(sfs) < sum(ref_sfs[j])                  # sampling loses mutations
+
+                # structure
+                @test isnothing(sub.parent)
+                @test sub.data.id == root.data.id                 # founder retained
+
+                # the source tree is untouched
+                @test compute_sfs(root, 1_000) == ref_sfs[j]
+            end
+        end
+
+        @testset "subsample_shard preserves order and filters nothing trees" begin
+            res = subsample_shard(sims[1:5], stem, 100)
+            @test res isa Vector{SubsampleResult{SimParams}}
+            @test length(res) == count(!isnothing, [s.tree_root for s in sims[1:5]])
+            @test [r.sim_index for r in res] == [i for i in 1:5 if !isnothing(sims[i].tree_root)]
+            for r in res
+                @test r.n      == 100
+                @test r.N_full == 1_000
+                @test r.seed   === sample_seed(stem, r.sim_index, 100)
+                @test r.params == sims[r.sim_index].params
+                @test length(r.sampled_ids) == 100
+                @test sort([l.data.id for l in Leaves(r.tree_root)]) == sort(r.sampled_ids)
+            end
+        end
+
+        @testset "subsample_file writes both sizes and is resumable" begin
+            out = mktempdir()
+            small = joinpath(out, "src")
+            mkpath(small)
+            serialize(joinpath(small, stem * ".jls"), sims[1:4])
+
+            subsample_file(joinpath(small, stem * ".jls"), out, [100])
+            f = joinpath(out, stem * "_n100.jls")
+            @test isfile(f)
+            first_ids = [r.sampled_ids for r in deserialize(f)]
+            @test length(first_ids) == 4
+
+            mtime_before = mtime(f)
+            subsample_file(joinpath(small, stem * ".jls"), out, [100])   # resumes: no work
+            @test mtime(f) == mtime_before
+
+            rm(f)
+            subsample_file(joinpath(small, stem * ".jls"), out, [100])   # redo after delete
+            @test [r.sampled_ids for r in deserialize(f)] == first_ids   # same draws
+            rm(out; recursive = true)
+        end
+    end
+end
+
 end
