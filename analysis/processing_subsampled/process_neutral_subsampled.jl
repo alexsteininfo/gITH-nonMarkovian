@@ -85,7 +85,9 @@ function process_file(raw_path::String, proc_dir::String, label::String)
     )
         outdir = joinpath(proc_dir, subdir)
         mkpath(outdir)
-        serialize(joinpath(outdir, stem * ".jls"), data)
+        # Atomic: the `isfile`-based resumability check above must never see a
+        # truncated file left by a kill mid-write.
+        serialize_atomic(joinpath(outdir, stem * ".jls"), data)
     end
 
     println("    → saved $(length(all_params)) results to $proc_dir")

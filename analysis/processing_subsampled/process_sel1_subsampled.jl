@@ -57,6 +57,12 @@ function process_file(raw_path::String, proc_dir::String, full_injection_path::S
     isfile(full_injection_path) ||
         error("$label: missing $full_injection_path — run analysis/processing/process_sel1.jl first")
 
+    # The full-tree params array lives alongside injection, with "params" substituted
+    # for the quantity name.
+    full_params_path = replace(full_injection_path, "injection" => "params")
+    isfile(full_params_path) ||
+        error("$label: missing $full_params_path — run analysis/processing/process_sel1.jl first")
+
     println("  Processing: $(basename(raw_path))")
 
     subs      = deserialize(raw_path)::Vector{SubsampleResult{Sel1Params}}
@@ -65,6 +71,19 @@ function process_file(raw_path::String, proc_dir::String, full_injection_path::S
     length(injection) == length(subs) ||
         error("$label: $(length(subs)) subsamples vs $(length(injection)) full-tree " *
               "injection entries — the two stages are not co-indexed")
+
+    # The length check above passes under any permutation of the same multiset.
+    # Params equality is fully discriminating: `Sel1Params` carries the
+    # per-simulation `(N_critic, rep)`, so two co-indexed arrays can only match
+    # element-for-element if every position lines up. The realistic trigger is
+    # `process_sel1.jl` being resumable itself: a re-simulated raw shard combined
+    # with a selectively-deleted full-tree output on one side and not the other
+    # would still pass the length check but fail this one.
+    full_params = deserialize(full_params_path)::Vector{Sel1Params}
+    [s.params for s in subs] == full_params ||
+        error("$label: subsampled params do not match $(basename(full_params_path)) " *
+              "element-for-element for shard $(basename(raw_path)) — the subsampling " *
+              "and full-tree processing stages have come apart")
 
     all_params       = Sel1Params[]
     all_mut_per_cell = Vector{Int}[]
@@ -96,7 +115,9 @@ function process_file(raw_path::String, proc_dir::String, full_injection_path::S
     )
         outdir = joinpath(proc_dir, subdir)
         mkpath(outdir)
-        serialize(joinpath(outdir, stem * ".jls"), data)
+        # Atomic: the `isfile`-based resumability check above must never see a
+        # truncated file left by a kill mid-write.
+        serialize_atomic(joinpath(outdir, stem * ".jls"), data)
     end
 
     println("    → saved $(length(all_params)) results to $proc_dir")

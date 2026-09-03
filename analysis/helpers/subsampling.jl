@@ -7,6 +7,30 @@ using AbstractTrees
 using Random
 using Serialization
 
+# ── Atomic writes ─────────────────────────────────────────────────────────────
+
+"""
+    serialize_atomic(path, data)
+
+Serialize `data` to `path` via a temporary file plus rename, instead of
+`serialize(path, data)` directly.
+
+Every stage in this pipeline (this file's `subsample_file` and the three
+`process_*_subsampled.jl` scripts) decides "already done" purely from
+`isfile(path)`, so a resumed run treats *any* file at `path` as complete.
+`serialize` writes in place, so a kill mid-write — a real hazard on a
+multi-hour sweep — would leave a truncated-but-present file that a later run
+silently skips instead of regenerating. Writing to `path * ".tmp"` and then
+renaming into place means `path` only ever exists once the write is complete;
+`mv` within the same directory is atomic on the local filesystem.
+"""
+function serialize_atomic(path::AbstractString, data)
+    tmp = path * ".tmp"
+    serialize(tmp, data)
+    mv(tmp, path; force = true)
+    return nothing
+end
+
 # ── Sample sizes ──────────────────────────────────────────────────────────────
 
 """
@@ -171,7 +195,8 @@ function subsample_file(raw_path::String, out_dir::String, ns::Vector{Int})
         skipped = length(sims) - length(res)
         skipped > 0 &&
             @warn "  $stem: skipped $skipped / $(length(sims)) sims with nothing tree"
-        serialize(joinpath(out_dir, "$(stem)_n$(n).jls"), res)
+        # Atomic: the `isfile` resumability check above must never see a truncated file.
+        serialize_atomic(joinpath(out_dir, "$(stem)_n$(n).jls"), res)
         println("    → n=$n: $(length(res)) subsampled trees")
     end
 

@@ -80,6 +80,27 @@ end
     end
 end
 
+@testset "serialize_atomic writes atomically and leaves no tmp file" begin
+    dir  = mktempdir()
+    path = joinpath(dir, "demo.jls")
+    tmp  = path * ".tmp"
+
+    @test !isfile(path)
+    serialize_atomic(path, [1, 2, 3])
+    @test isfile(path)
+    @test !isfile(tmp)
+    @test deserialize(path) == [1, 2, 3]
+
+    # A forced redo — the pipeline's resumability idiom is "delete the output, rerun"
+    # — still leaves the destination complete and no tmp file behind.
+    serialize_atomic(path, [9, 9])
+    @test isfile(path)
+    @test !isfile(tmp)
+    @test deserialize(path) == [9, 9]
+
+    rm(dir; recursive = true)
+end
+
 @testset "sample_sizes is an exact table" begin
     @test sample_sizes(1_000)  == [100]
     @test sample_sizes(1_024)  == [102]
@@ -169,6 +190,16 @@ end
         b, ids_b, _ = subsample_tree(full, 2, UInt64(42))
         @test ids_a == ids_b
         @test compute_sfs(a, 2) == compute_sfs(b, 2)
+
+        # Same seed reproduces a draw (above); different seeds must actually give a
+        # different draw. Seeds 42 and 2 were confirmed by hand to land on different
+        # pairs of the fixture's 3 leaves ([3, 5] vs [3, 4]), so this cannot flake on
+        # an unlucky coincidence of seed and fixture.
+        c, ids_c, _ = subsample_tree(full, 2, UInt64(2))
+        @test sort(ids_a) == [3, 5]
+        @test sort(ids_c) == [3, 4]
+        @test sort(ids_a) != sort(ids_c)
+
         @test_throws ErrorException subsample_tree(full, 4, UInt64(1))
         @test_throws ErrorException subsample_tree(full, 0, UInt64(1))
     end
@@ -308,7 +339,7 @@ end
             end
         end
 
-        @testset "subsample_file writes both sizes and is resumable" begin
+        @testset "subsample_file writes one size and is resumable" begin
             out = mktempdir()
             small = joinpath(out, "src")
             mkpath(small)

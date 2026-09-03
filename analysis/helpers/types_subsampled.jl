@@ -35,6 +35,14 @@ copies them across from `data/processed/`.
 - `seed` — rng seed of this draw; the draw is a pure function of
   `(tree, seed, n)` and so replays in isolation
 - `sampled_ids` — `NonMarkovCell.id` of each drawn cell, in draw order
+
+Forward-compatibility note: there is no draw-replicate field. `sample_seed`
+currently makes `(stem, sim_index, n)` determine the draw uniquely, so "k
+independent draws per (sim, n)" cannot be added later by widening this struct —
+doing so would make the 525 existing shards unreadable under `Serialization`
+(see `CLAUDE.md`). It would have to come either as a new struct/filename
+convention, or by overloading `n` in the filename (e.g. one draw's `n` tagged
+with a replicate suffix) rather than as a field here.
 """
 struct SubsampleResult{P}
     tree_root::BinaryNode{NonMarkovCell}

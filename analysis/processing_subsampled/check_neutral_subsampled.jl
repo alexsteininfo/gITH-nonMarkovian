@@ -13,8 +13,9 @@ const FULL = joinpath(ROOT, "data", "processed",            "neutral")
 const SUB  = joinpath(ROOT, "data", "processed_subsampled", "neutral")
 
 # Cross-check the subsampled arrays against the full-tree arrays they are meant to
-# be co-indexed with. Everything here is a property that must hold by construction;
-# a violation means the two stages have come apart.
+# be co-indexed with. Most of what follows is a property that must hold by
+# construction if the two stages are still co-indexed; see the note at the params
+# assertion below for the one check that is weaker than it looks.
 
 for (model, stem, N, n) in (
         ("gamma",         "neutral_gamma_N10000_d0.5_k5.0",   10_000, 1_000),
@@ -30,6 +31,11 @@ for (model, stem, N, n) in (
     f_par, s_par = deserialize(fp("params")), deserialize(sp("params"))
 
     @assert length(s_sfs) == length(f_sfs)                 "sim count differs: $stem"
+    # Catches a wrong-shard pairing and a length mismatch. It does NOT catch a
+    # reordering for the neutral scenario: every neutral `SimParams` array is 200
+    # structurally identical elements (unlike `Sel1Params`/`Sel2Params`, which carry
+    # per-simulation `rep`/`seed`/`N_critic`), so a permutation of `s_par` would still
+    # equal `f_par` here.
     @assert s_par == f_par                                 "params not co-indexed: $stem"
     @assert all(length.(s_sfs) .== n)                      "sfs length != n: $stem"
     @assert all(length.(s_mpc) .== n)                      "mut_per_cell length != n: $stem"
@@ -43,6 +49,11 @@ for (model, stem, N, n) in (
 
     # Sampling can only lose mutations and can never invent a depth or a burden.
     @assert all(sum(s_sfs[i]) <= sum(f_sfs[i]) for i in eachindex(s_sfs)) "sub sfs exceeds full: $stem"
+    # Vacuous for the deterministic model: Dirac division timing with no death gives
+    # a perfect binary tree, so every leaf sits at the same depth and both sets are
+    # the same singleton — this check is only substantive for gamma/markov. The
+    # `mut_per_cell` subset check below and the sfs/burden bookkeeping assertion
+    # above remain substantive for deterministic too.
     @assert all(issubset(Set(s_ld[i]),  Set(f_ld[i]))  for i in eachindex(s_ld))  "unseen depth: $stem"
     @assert all(issubset(Set(s_mpc[i]), Set(f_mpc[i])) for i in eachindex(s_mpc)) "unseen burden: $stem"
 

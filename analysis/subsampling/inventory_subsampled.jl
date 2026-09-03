@@ -24,6 +24,15 @@ const S1 = collect(0.1:0.1:2.0)
 const S2 = [0.05, 0.10, 0.15, 0.20]
 const M  = 10.0
 
+# Quick (default): the missing-file scan plus a 21-shard sample deep check, seconds.
+# Full sweep (--deep): also deserializes every file under both data trees — several
+# minutes over 4.75 GB. Printed up front so a reader of the output can never mistake
+# one mode for the other.
+const DEEP_MODE = "--deep" in ARGS
+println(DEEP_MODE ?
+    "Mode: FULL SWEEP (--deep) — every raw_subsampled and processed_subsampled file will be deserialized" :
+    "Mode: quick (default) — missing-file scan + sampled deep check only; pass --deep for a full sweep")
+
 # (scenario, model, full_stem, N_target)
 function expected_stems()
     out = Tuple{String, String, String, Int}[]
@@ -83,9 +92,11 @@ println("processed_subsampled : $n_proc files present, $(length(missing_proc)) m
 for p in first(missing_raw,  20); println("  MISSING raw:  ", relpath(p, ROOT)); end
 for p in first(missing_proc, 20); println("  MISSING proc: ", relpath(p, ROOT)); end
 
-# Deep-check one shard per (scenario, model, n) combination: the sfs length must
-# equal the recorded n, and the tree's leaves must be exactly the recorded draw.
-println("\n── Deep check ─────────────────────────────────────────────────────────")
+# Deep-check one raw shard per (scenario, model, n) combination — 21 of 525, first
+# simulation only, and no processed file is opened here (that's what --deep below is
+# for). For the shard it does open: the first entry's recorded n and N_full match
+# the filename, and its tree's leaves are exactly the recorded sampled_ids.
+println("\n── Deep check (quick sample) ─────────────────────────────────────────")
 seen = Set{Tuple{String, String, Int}}()
 problems = 0
 for (scenario, model, stem, N) in expected_stems()
@@ -97,17 +108,65 @@ for (scenario, model, stem, N) in expected_stems()
         isfile(raw) || continue
         push!(seen, key)
 
-        subs = deserialize(raw)
-        r    = subs[1]
-        ids  = sort([l.data.id for l in Leaves(r.tree_root)])
-        ok   = r.n == n && r.N_full == N && ids == sort(r.sampled_ids) &&
-               length(r.sampled_ids) == n && length(unique(r.sampled_ids)) == n
-        ok || (problems += 1)
-        println(rpad("$scenario/$model n=$n", 40), ok ? " OK" : " PROBLEM",
-                "  sims=", length(subs), "  eltype=", eltype(subs))
+        # A corrupt/truncated file must be tallied as a malformed shard, not abort
+        # the whole run with a stack trace — this is the only place a genuinely
+        # unreadable raw shard would otherwise go unnoticed in the default quick mode.
+        try
+            subs = deserialize(raw)
+            r    = subs[1]
+            ids  = sort([l.data.id for l in Leaves(r.tree_root)])
+            ok   = r.n == n && r.N_full == N && ids == sort(r.sampled_ids) &&
+                   length(r.sampled_ids) == n && length(unique(r.sampled_ids)) == n
+            ok || (problems += 1)
+            println(rpad("$scenario/$model n=$n", 40), ok ? " OK" : " PROBLEM",
+                    "  sims=", length(subs), "  eltype=", eltype(subs))
+        catch e
+            problems += 1
+            println(rpad("$scenario/$model n=$n", 40), " MALFORMED  ",
+                    relpath(raw, ROOT), "  (", typeof(e), ")")
+        end
     end
 end
 
+# ── Full sweep (opt-in via --deep) ──────────────────────────────────────────────
+#
+# The quick deep check above proves almost nothing about the bulk of the data: it
+# opens 21 of 525 raw shards and 0 of 3108 processed files. This instead
+# deserializes every file under both data trees and only checks that the read
+# succeeds — proof against truncation/corruption, not a repeat of the quick check's
+# structural validation, which already covers a sample.
+function full_sweep()
+    n_swept = 0
+    n_unreadable = 0
+    for dir in (joinpath(ROOT, "data", "raw_subsampled"),
+                joinpath(ROOT, "data", "processed_subsampled"))
+        for (dirpath, _, files) in walkdir(dir)
+            for f in files
+                endswith(f, ".jls") || continue
+                path = joinpath(dirpath, f)
+                n_swept += 1
+                try
+                    deserialize(path)
+                catch e
+                    n_unreadable += 1
+                    println("  UNREADABLE: ", relpath(path, ROOT), "  (", typeof(e), ")")
+                end
+            end
+        end
+    end
+    return n_swept, n_unreadable
+end
+
+n_unreadable = 0
+if DEEP_MODE
+    println("\n── Full sweep (--deep) ─────────────────────────────────────────────────")
+    n_swept, n_unreadable = full_sweep()
+    println("full sweep: $n_swept files read, $n_unreadable unreadable")
+end
+
 total_missing = length(missing_raw) + length(missing_proc)
-println("\n$(total_missing) missing files, $problems malformed shards")
+problems += n_unreadable
+println("\n$(total_missing) missing files, $problems malformed shards",
+        DEEP_MODE ? " (includes $n_unreadable unreadable in the full sweep)" : "")
+println(DEEP_MODE ? "Mode was: FULL SWEEP (--deep)" : "Mode was: quick (default)")
 exit(total_missing == 0 && problems == 0 ? 0 : 1)
