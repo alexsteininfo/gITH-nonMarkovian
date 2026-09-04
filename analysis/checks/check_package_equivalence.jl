@@ -93,6 +93,60 @@ isempty(roots) &&
     @test checked == 3
 end
 
+@testset "I-1 / HR-10: leaf_fitness matches the stored stage-2 arrays (selection 2)" begin
+    # The testset above never exercises `leaf_fitness`, and its shard
+    # (neutral_gamma_N1000_d0.5_k5.0) has every cell's fitness exactly 1.0 — so a
+    # reordering bug in `leaf_fitness` would be invisible there even in principle.
+    # `leaf_fitness` has three production call sites
+    # (analysis/processing/process_sel2.jl:86,
+    # analysis/processing_subsampled/process_sel1_subsampled.jl:104,
+    # analysis/processing_subsampled/process_sel2_subsampled.jl:97) writing arrays
+    # documented as co-indexed with `mut_per_cell`. This selection-2 shard has 200
+    # trees with genuinely varying fitness, so order is observable here.
+    sel2_stem = "sel2_gamma_N1000_d0.5_k5.0_s0.2_M10.0"
+    sel2_raw  = joinpath(ROOT, "data", "raw", "selection_2", "gamma",
+                         "$(sel2_stem).jls")
+    isfile(sel2_raw) || error("missing selection-2 raw shard for the gate: $sel2_raw")
+
+    sel2_sims  = deserialize(sel2_raw)::Vector{Sel2SimResult}
+    sel2_roots = [s.tree_root for s in sel2_sims if !isnothing(s.tree_root)]
+    println("  $(length(sel2_roots)) selection-2 trees")
+    # Same anti-vacuity guard as the raw-shard check above: without it, a
+    # corrupted or all-`nothing` shard makes the loop below a silent no-op.
+    isempty(sel2_roots) &&
+        error("selection-2 raw shard deserialized to zero non-nothing trees — " *
+              "nothing to compare: $sel2_raw")
+
+    # Before trusting any fitness comparison, confirm the shard actually
+    # discriminates order: a shard where every tree has one fitness value would
+    # pass a `leaf_fitness` check even with a reordering bug — exactly the gap
+    # this testset exists to close.
+    n_discriminating = count(r -> length(unique(leaf_fitness(r))) > 1, sel2_roots)
+    @test n_discriminating > length(sel2_roots) ÷ 2
+
+    checked = 0
+    for quantity in ("sfs", "mut_per_cell", "leaf_depths", "leaf_fitness")
+        path = joinpath(ROOT, "data", "processed", "selection_2", "gamma", quantity,
+                        "$(sel2_stem).jls")
+        isfile(path) || (@info "skipping (not processed): $path"; continue)
+        stored = deserialize(path)
+        @test length(stored) == length(sel2_roots)
+        for (j, root) in enumerate(sel2_roots)
+            N = length(collect(Leaves(root)))
+            recomputed = quantity == "sfs"          ? sitefrequencyspectrum(root, N) :
+                         quantity == "mut_per_cell" ? mutations_per_cell(root) :
+                         quantity == "leaf_depths"  ? leaf_depths(root) :
+                                                      leaf_fitness(root)
+            @test recomputed == stored[j]
+        end
+        checked += 1
+    end
+    # Without this the testset would pass with 0 assertions if the processed
+    # arrays were missing. All four quantities are confirmed present on disk in
+    # this repo today.
+    @test checked == 4
+end
+
 @testset "HR-1: the package sampler reproduces the stored draws" begin
     stored = deserialize(SUB_SHARD)
     @test !isempty(stored)

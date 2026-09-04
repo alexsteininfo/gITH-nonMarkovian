@@ -35,10 +35,14 @@ preserving the full lineage tree for exact SFS/coalescence analysis.
 ```
 theory/     Analytical derivations (model, SFS, scMB, inference) — read these first
 analysis/
-  sim_runs/     Scripts that run simulations via MutationLoadDynamics.jl → data/raw/
-  processing/   Extract SFS / mutation burden / leaf depths → data/processed/
-  plots/        Compare empirical results against theory → plots/
-  helpers/      Shared types (types.jl) and theory formulas (theory.jl)
+  sim_runs/               Scripts that run simulations via MutationLoadDynamics.jl → data/raw/
+  processing/             Extract SFS / mutation burden / leaf depths → data/processed/
+  subsampling/            Draw a uniform n-cell subsample of each tree → data/raw_subsampled/
+  processing_subsampled/  Same quantities as processing/, recomputed on the subsamples
+                          → data/processed_subsampled/
+  plots/                  Compare empirical results against theory → plots/
+  checks/                 Equivalence gate: package statistics/sampling vs. stored data
+  helpers/                Shared types (types.jl) and theory formulas (theory.jl)
 data/       Serialized (.jls) simulation output — raw trees and processed summaries
 plots/      Generated figures (PNG)
 ```
