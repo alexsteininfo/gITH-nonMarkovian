@@ -895,7 +895,7 @@ version = "0.2.7"
 deps = ["AbstractTrees", "DataStructures", "Distributions", "Random", "Statistics", "StatsBase"]
 path = "/Users/alexanderstein/Documents/GitHub/MutationLoadDynamics.jl"
 uuid = "7b855ee6-6887-412f-a571-26d20a5a92d7"
-version = "0.2.0"
+version = "0.3.0"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
