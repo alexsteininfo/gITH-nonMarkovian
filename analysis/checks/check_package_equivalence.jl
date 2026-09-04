@@ -54,12 +54,22 @@ println("Deserializing $(basename(RAW_SHARD)) …")
 sims = deserialize(RAW_SHARD)
 roots = [s.tree_root for s in sims if !isnothing(s.tree_root)]
 println("  $(length(roots)) trees")
+# Without this, a corrupted or all-`nothing` raw shard makes every loop below a
+# silent no-op: the testsets that iterate `roots` would report 0/0 and pass,
+# and the gate would print "safe to migrate" having compared nothing.
+isempty(roots) &&
+    error("raw shard deserialized to zero non-nothing trees — nothing to compare: $RAW_SHARD")
 
 @testset "package equivalence gate" begin
 
 @testset "HR-10: tree statistics are output-preserving" begin
     for (i, root) in enumerate(roots)
         N = length(collect(Leaves(root)))
+        # Tautological by construction: compute_mut_per_cell is a one-line
+        # pass-through to this very function, and mutations_per_cell pre-dates
+        # this migration. Kept for symmetry with the other five. The real
+        # coverage for this quantity is the stored-array comparison below and
+        # the induced-tree check in the HR-1 testset.
         @test mutations_per_cell(root)          == compute_mut_per_cell(root)
         @test leaf_depths(root)                 == compute_leaf_depths(root)
         @test sitefrequencyspectrum(root, N)    == compute_sfs(root, N)
@@ -73,6 +83,7 @@ end
 @testset "HR-10: package statistics match the stored stage-2 arrays" begin
     # The strongest form of the check: compare against what is actually on disk,
     # not just against the helper that produced it.
+    checked = 0
     for quantity in ("sfs", "mut_per_cell", "leaf_depths")
         path = joinpath(ROOT, "data", "processed", "neutral", "gamma", quantity,
                         "$(STEM).jls")
@@ -86,7 +97,12 @@ end
                                                       leaf_depths(root)
             @test recomputed == stored[j]
         end
+        checked += 1
     end
+    # Without this the testset passes with 0 assertions when the processed arrays
+    # are missing, and the gate prints "safe to migrate" having verified nothing.
+    # All three quantities are confirmed present on disk in this repo today.
+    @test checked == 3
 end
 
 @testset "HR-1: the package sampler reproduces the stored draws" begin
