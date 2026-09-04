@@ -57,7 +57,7 @@ end
 
 # Returns (smean, sstd, ssingle) from actual SFS vectors.
 # Each element of all_sfs is a Vector{Int} of length actual_N where sfs[k] =
-# number of mutations found in exactly k cells.  compute_sfs already includes
+# number of mutations found in exactly k cells.  sitefrequencyspectrum already includes
 # k=1 (leaf-branch / private mutations), so no correction is needed here.
 function aggregate_actual_sfs(all_sfs::Vector{Vector{Int}})
     maxN = maximum(length.(all_sfs))

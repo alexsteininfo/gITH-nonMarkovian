@@ -6,7 +6,6 @@ using AbstractTrees
 using Serialization
 
 include(joinpath(dirname(@__DIR__), "helpers", "types_selection1.jl"))
-include(joinpath(dirname(@__DIR__), "helpers", "tree_analysis.jl"))
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -73,9 +72,9 @@ function process_file(raw_path::String, proc_dir::String, label::String)
         actual_N = length(collect(Leaves(root)))
 
         push!(all_params,       sim.params)
-        push!(all_mut_per_cell, compute_mut_per_cell(root))
-        push!(all_sfs,          compute_sfs(root, actual_N))
-        push!(all_leaf_depths,  compute_leaf_depths(root))
+        push!(all_mut_per_cell, mutations_per_cell(root))
+        push!(all_sfs,          sitefrequencyspectrum(root, actual_N))
+        push!(all_leaf_depths,  leaf_depths(root))
         push!(all_injection,    sim.injection)
     end
 

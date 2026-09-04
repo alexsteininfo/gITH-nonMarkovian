@@ -10,7 +10,6 @@ const HELPERS = joinpath(dirname(@__DIR__), "helpers")
 
 include(joinpath(HELPERS, "types_selection1.jl"))
 include(joinpath(HELPERS, "types_subsampled.jl"))
-include(joinpath(HELPERS, "tree_analysis.jl"))
 include(joinpath(HELPERS, "subsampling.jl"))
 
 const RAW       = joinpath(@__DIR__, "..", "..", "data", "raw_subsampled",       "selection_1")
@@ -93,16 +92,16 @@ function process_file(raw_path::String, proc_dir::String, full_injection_path::S
 
     for s in subs
         root   = s.tree_root
-        depths = compute_leaf_depths(root)
+        depths = leaf_depths(root)
 
         length(depths) == s.n ||
             error("$label: sim $(s.sim_index) has $(length(depths)) leaves, expected n = $(s.n)")
 
         push!(all_params,       s.params)
-        push!(all_mut_per_cell, compute_mut_per_cell(root))
-        push!(all_sfs,          compute_sfs(root, s.n))
+        push!(all_mut_per_cell, mutations_per_cell(root))
+        push!(all_sfs,          sitefrequencyspectrum(root, s.n))
         push!(all_leaf_depths,  depths)
-        push!(all_leaf_fitness, compute_leaf_fitness(root))
+        push!(all_leaf_fitness, leaf_fitness(root))
     end
 
     for (subdir, data) in (

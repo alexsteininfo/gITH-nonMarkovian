@@ -6,7 +6,6 @@ using AbstractTrees
 using Serialization
 
 include(joinpath(dirname(@__DIR__), "helpers", "types.jl"))
-include(joinpath(dirname(@__DIR__), "helpers", "tree_analysis.jl"))
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +20,7 @@ const PROC = joinpath(@__DIR__, "..", "..", "data", "processed", "neutral")
 #   sfs          — site frequency spectrum (Vector{Int64}, sfs[k] = # mutations in k cells)
 #
 # With ν=2.0, each division sprinkles Poisson(2.0) neutral mutations onto the
-# branch; compute_sfs and compute_mut_per_cell read node.data.mutations directly.
+# branch; sitefrequencyspectrum and mutations_per_cell read node.data.mutations directly.
 
 function process_file(raw_path::String, proc_dir::String, label::String)
     println("  Processing: $(basename(raw_path))")
@@ -30,7 +29,7 @@ function process_file(raw_path::String, proc_dir::String, label::String)
 
     # Collect per-simulation outputs, skipping any run whose tree is nothing.
     # With ν=2.0, node.data.mutations holds actual simulated neutral mutations;
-    # compute_mut_per_cell and compute_sfs read these directly.
+    # mutations_per_cell and sitefrequencyspectrum read these directly.
     # leaf_depths are also saved for empirical Theorem 3 (avoids Poisson D_L≈1 approximation).
     all_params       = SimParams[]
     all_mut_per_cell = Vector{Int}[]
@@ -49,9 +48,9 @@ function process_file(raw_path::String, proc_dir::String, label::String)
         actual_N = length(collect(Leaves(root)))
 
         push!(all_params,       sim.params)
-        push!(all_mut_per_cell, compute_mut_per_cell(root))
-        push!(all_sfs,          compute_sfs(root, actual_N))
-        push!(all_leaf_depths,  compute_leaf_depths(root))
+        push!(all_mut_per_cell, mutations_per_cell(root))
+        push!(all_sfs,          sitefrequencyspectrum(root, actual_N))
+        push!(all_leaf_depths,  leaf_depths(root))
     end
 
     skipped > 0 && @warn "  $label: skipped $skipped / $(length(sims)) sims with nothing tree"

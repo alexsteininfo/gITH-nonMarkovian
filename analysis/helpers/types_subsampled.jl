@@ -5,7 +5,7 @@
 # of a sampled leaf, with unary nodes retained rather than collapsed. That is the
 # same shape `prune_tree!` leaves behind when a lineage dies out, so the stored root
 # is a `BinaryNode{NonMarkovCell}` indistinguishable in kind from a full tree and
-# every helper in `tree_analysis.jl` applies to it unchanged.
+# every tree statistic in MutationLoadDynamics.jl applies to it unchanged.
 #
 # `include`d (not imported) by every subsampling stage so that independent scripts
 # see identical definitions. Deliberately defines *only* `SubsampleResult`: each

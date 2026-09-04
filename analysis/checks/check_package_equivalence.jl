@@ -1,8 +1,9 @@
 # Equivalence gate for the migration to MutationLoadDynamics.jl v0.3.0.
 #
-# Run this BEFORE deleting analysis/helpers/tree_analysis.jl or the sampling
-# internals of analysis/helpers/subsampling.jl. It answers two questions against
-# real data:
+# Originally run before deleting the local tree-statistics helpers (Task 11) and
+# before removing the sampling internals of analysis/helpers/subsampling.jl
+# (Task 10). Both migrations are complete; the remaining testsets continue to
+# validate the package against real data:
 #
 #   HR-10  do the package's tree statistics return exactly what the local helpers
 #          return, element for element and in the same order? 4.3 GB of stage-2
@@ -34,7 +35,6 @@ include(joinpath(HELPERS, "types.jl"))
 include(joinpath(HELPERS, "types_selection1.jl"))
 include(joinpath(HELPERS, "types_selection2.jl"))
 include(joinpath(HELPERS, "types_subsampled.jl"))
-include(joinpath(HELPERS, "tree_analysis.jl"))
 include(joinpath(HELPERS, "subsampling.jl"))
 
 # One small neutral shard is enough for the statistics comparison: the functions
@@ -62,23 +62,11 @@ isempty(roots) &&
 
 @testset "package equivalence gate" begin
 
-@testset "HR-10: tree statistics are output-preserving" begin
-    for (i, root) in enumerate(roots)
-        N = length(collect(Leaves(root)))
-        # Tautological by construction: compute_mut_per_cell is a one-line
-        # pass-through to this very function, and mutations_per_cell pre-dates
-        # this migration. Kept for symmetry with the other five. The real
-        # coverage for this quantity is the stored-array comparison below and
-        # the induced-tree check in the HR-1 testset.
-        @test mutations_per_cell(root)          == compute_mut_per_cell(root)
-        @test leaf_depths(root)                 == compute_leaf_depths(root)
-        @test sitefrequencyspectrum(root, N)    == compute_sfs(root, N)
-        @test branch_spectrum(root, N)          == compute_branch_spectrum(root, N)
-        @test leaf_fitness(root)                == compute_leaf_fitness(root)
-        @test filtered_mutations_per_cell(root, 0.3) ==
-              compute_filtered_mut_per_cell(root, 0.3)
-    end
-end
+# The "HR-10: tree statistics are output-preserving" testset compared the package
+# functions against analysis/helpers/tree_analysis.jl. It passed on every tree of
+# neutral_gamma_N1000_d0.5_k5.0.jls before that file was deleted in the v0.3.0
+# migration; the comparison is no longer expressible. The remaining testsets
+# compare against the arrays actually on disk, which is the stronger check anyway.
 
 @testset "HR-10: package statistics match the stored stage-2 arrays" begin
     # The strongest form of the check: compare against what is actually on disk,
@@ -115,9 +103,9 @@ end
         @test s.sampled_ids == sub.sampled_ids
         @test s.N_full      == sub.N_full
         # And the induced trees agree on every observable.
-        @test mutations_per_cell(s.root) == compute_mut_per_cell(sub.tree_root)
-        @test leaf_depths(s.root)        == compute_leaf_depths(sub.tree_root)
-        @test sitefrequencyspectrum(s.root, sub.n) == compute_sfs(sub.tree_root, sub.n)
+        @test mutations_per_cell(s.root) == mutations_per_cell(sub.tree_root)
+        @test leaf_depths(s.root)        == leaf_depths(sub.tree_root)
+        @test sitefrequencyspectrum(s.root, sub.n) == sitefrequencyspectrum(sub.tree_root, sub.n)
     end
 end
 

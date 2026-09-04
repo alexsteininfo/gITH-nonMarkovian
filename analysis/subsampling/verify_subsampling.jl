@@ -14,7 +14,6 @@ include(joinpath(HELPERS, "types.jl"))
 include(joinpath(HELPERS, "types_selection1.jl"))
 include(joinpath(HELPERS, "types_selection2.jl"))
 include(joinpath(HELPERS, "types_subsampled.jl"))
-include(joinpath(HELPERS, "tree_analysis.jl"))
 include(joinpath(HELPERS, "subsampling.jl"))
 
 # ── Fixture ───────────────────────────────────────────────────────────────────
@@ -28,9 +27,9 @@ include(joinpath(HELPERS, "subsampling.jl"))
 #   └── R  (id 3, mut 7, t 1.2)       leaf
 #
 #   Leaves(root) order = [4, 5, 3]
-#   compute_mut_per_cell = [8, 9, 12]   (root's 5 is included in every burden)
-#   compute_leaf_depths  = [1, 2, 2]    (own stack order, not Leaves order)
-#   compute_sfs(root, 3) = [12, 1, 5]
+#   mutations_per_cell = [8, 9, 12]   (root's 5 is included in every burden)
+#   leaf_depths  = [1, 2, 2]    (own stack order, not Leaves order)
+#   sitefrequencyspectrum(root, 3) = [12, 1, 5]
 
 function fixture_tree()
     root = BinaryNode(NonMarkovCell(1, 0.0, 5, 1.0))
@@ -46,9 +45,9 @@ end
 @testset "fixture matches the helpers" begin
     root = fixture_tree()
     @test [l.data.id for l in Leaves(root)] == [4, 5, 3]
-    @test compute_mut_per_cell(root)        == [8, 9, 12]
-    @test compute_leaf_depths(root)         == [1, 2, 2]
-    @test compute_sfs(root, 3)              == [12, 1, 5]
+    @test mutations_per_cell(root)        == [8, 9, 12]
+    @test leaf_depths(root)         == [1, 2, 2]
+    @test sitefrequencyspectrum(root, 3)              == [12, 1, 5]
 end
 
 @testset "SubsampleResult round-trips through Serialization" begin
@@ -74,8 +73,8 @@ end
         @test back[1].seed        === UInt64(0xabc)
         @test back[1].sampled_ids == Int64[4, 5, 3]
         # the tree survives the round trip, parent links included
-        @test compute_sfs(back[1].tree_root, 3) == [12, 1, 5]
-        @test compute_mut_per_cell(back[1].tree_root) == [8, 9, 12]
+        @test sitefrequencyspectrum(back[1].tree_root, 3) == [12, 1, 5]
+        @test mutations_per_cell(back[1].tree_root) == [8, 9, 12]
         rm(path)
     end
 end
@@ -125,9 +124,9 @@ end
 
 @testset "subsample_tree on the fixture" begin
     full = fixture_tree()
-    full_sfs    = compute_sfs(full, 3)
-    full_mpc    = compute_mut_per_cell(full)
-    full_depths = compute_leaf_depths(full)
+    full_sfs    = sitefrequencyspectrum(full, 3)
+    full_mpc    = mutations_per_cell(full)
+    full_depths = leaf_depths(full)
 
     # id-labelled reference values from the full tree
     depth_of  = Dict(4 => 2, 5 => 2, 3 => 1)
@@ -138,9 +137,9 @@ end
         sub, ids, N_full = _s.root, _s.sampled_ids, _s.N_full
         @test N_full == 3
         @test sort(ids) == [3, 4, 5]
-        @test compute_sfs(sub, 3)       == full_sfs
-        @test compute_mut_per_cell(sub) == full_mpc
-        @test compute_leaf_depths(sub)  == full_depths
+        @test sitefrequencyspectrum(sub, 3)       == full_sfs
+        @test mutations_per_cell(sub) == full_mpc
+        @test leaf_depths(sub)  == full_depths
         @test [l.data.id for l in Leaves(sub)] == [4, 5, 3]
     end
 
@@ -161,12 +160,12 @@ end
             @test isnothing(sub.parent)                 # new root is detached
             @test sub.data.id == 1                      # founder retained
             # cell-level quantities are unchanged by sampling
-            @test compute_leaf_depths(sub)  == [depth_of[ids[1]]]
-            @test compute_mut_per_cell(sub) == [burden_of[ids[1]]]
+            @test leaf_depths(sub)  == [depth_of[ids[1]]]
+            @test mutations_per_cell(sub) == [burden_of[ids[1]]]
             # SFS bookkeeping: every mutation counted once per carrier, both sides
-            sfs = compute_sfs(sub, 1)
+            sfs = sitefrequencyspectrum(sub, 1)
             @test length(sfs) == 1
-            @test sum(k * sfs[k] for k in 1:1) == sum(compute_mut_per_cell(sub))
+            @test sum(k * sfs[k] for k in 1:1) == sum(mutations_per_cell(sub))
         end
         @test sort(unique(drawn)) == [3, 4, 5]           # all leaves reachable
     end
@@ -178,8 +177,8 @@ end
             _s = sample_leaves(full, 2; seed = s)
             sub, ids, _ = _s.root, _s.sampled_ids, _s.N_full
             @test sort([l.data.id for l in Leaves(sub)]) == sort(ids)
-            sfs = compute_sfs(sub, 2)
-            @test sum(k * sfs[k] for k in 1:2) == sum(compute_mut_per_cell(sub))
+            sfs = sitefrequencyspectrum(sub, 2)
+            @test sum(k * sfs[k] for k in 1:2) == sum(mutations_per_cell(sub))
             if sort(ids) == [4, 5]
                 seen = true
                 @test sfs == [5, 6]   # sfs[1] = 2 + 3, sfs[2] = L's 1 + root's 5
@@ -194,7 +193,7 @@ end
         _sb = sample_leaves(full, 2; seed = UInt64(42))
         b, ids_b, _ = _sb.root, _sb.sampled_ids, _sb.N_full
         @test ids_a == ids_b
-        @test compute_sfs(a, 2) == compute_sfs(b, 2)
+        @test sitefrequencyspectrum(a, 2) == sitefrequencyspectrum(b, 2)
 
         # Same seed reproduces a draw (above); different seeds must actually give a
         # different draw. Seeds 42 and 2 were confirmed by hand to land on different
@@ -213,9 +212,9 @@ end
     @testset "the source tree is not mutated" begin
         sample_leaves(full, 1; seed = UInt64(3))
         sample_leaves(full, 2; seed = UInt64(4))
-        @test compute_sfs(full, 3)       == full_sfs
-        @test compute_mut_per_cell(full) == full_mpc
-        @test compute_leaf_depths(full)  == full_depths
+        @test sitefrequencyspectrum(full, 3)       == full_sfs
+        @test mutations_per_cell(full) == full_mpc
+        @test leaf_depths(full)  == full_depths
     end
 
     @testset "parent links in the rebuilt tree" begin
@@ -230,7 +229,7 @@ end
 end
 
 # ── Helpers: id-labelled reference values from a full tree ────────────────────
-# `compute_leaf_depths` returns an unlabelled vector in its own traversal order, so
+# `leaf_depths` returns an unlabelled vector in its own traversal order, so
 # comparing a subsample cell-by-cell needs id keys. `id_burden_map` reproduces
 # `mutations_per_cell`: it sums every ancestor's mutations including the root's.
 
@@ -289,9 +288,9 @@ end
                 sub, ids, N_full = _s.root, _s.sampled_ids, _s.N_full
                 @test N_full == 1_000
                 @test sort(ids) == sort([l.data.id for l in Leaves(root)])
-                @test compute_sfs(sub, N_full)  == ref_sfs[j]
-                @test compute_mut_per_cell(sub) == ref_mpc[j]
-                @test compute_leaf_depths(sub)  == ref_depths[j]
+                @test sitefrequencyspectrum(sub, N_full)  == ref_sfs[j]
+                @test mutations_per_cell(sub) == ref_mpc[j]
+                @test leaf_depths(sub)  == ref_depths[j]
             end
         end
 
@@ -315,12 +314,12 @@ end
                 # id-matched equality with the full tree, both quantities
                 @test id_depth_map(sub)  == Dict(id => depth[id]  for id in sub_ids)
                 @test id_burden_map(sub) == Dict(id => burden[id] for id in sub_ids)
-                @test compute_mut_per_cell(sub) == Int[burden[id] for id in sub_ids]
+                @test mutations_per_cell(sub) == Int[burden[id] for id in sub_ids]
 
                 # SFS bookkeeping
-                sfs = compute_sfs(sub, 100)
+                sfs = sitefrequencyspectrum(sub, 100)
                 @test length(sfs) == 100
-                @test sum(k * sfs[k] for k in 1:100) == sum(compute_mut_per_cell(sub))
+                @test sum(k * sfs[k] for k in 1:100) == sum(mutations_per_cell(sub))
                 @test sum(sfs) == sum(nd.data.mutations for nd in PreOrderDFS(sub))
                 @test sum(sfs) < sum(ref_sfs[j])                  # sampling loses mutations
 
@@ -329,7 +328,7 @@ end
                 @test sub.data.id == root.data.id                 # founder retained
 
                 # the source tree is untouched
-                @test compute_sfs(root, 1_000) == ref_sfs[j]
+                @test sitefrequencyspectrum(root, 1_000) == ref_sfs[j]
             end
         end
 

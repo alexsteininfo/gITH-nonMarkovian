@@ -7,7 +7,6 @@ using CairoMakie
 using Statistics
 
 include(joinpath(dirname(@__DIR__), "helpers", "types.jl"))
-include(joinpath(dirname(@__DIR__), "helpers", "tree_analysis.jl"))
 
 const MODES = [
     (name = "growth",     label = "Additive (fixed s)",      datadir = "growth",           pfx = "growth_s"),

@@ -10,7 +10,6 @@ const HELPERS = joinpath(dirname(@__DIR__), "helpers")
 
 include(joinpath(HELPERS, "types.jl"))
 include(joinpath(HELPERS, "types_subsampled.jl"))
-include(joinpath(HELPERS, "tree_analysis.jl"))
 include(joinpath(HELPERS, "subsampling.jl"))   # for the sample_sizes table
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -64,7 +63,7 @@ function process_file(raw_path::String, proc_dir::String, label::String)
 
     for s in subs
         root   = s.tree_root
-        depths = compute_leaf_depths(root)
+        depths = leaf_depths(root)
 
         # The stored n is authoritative for the sfs length; a mismatch means the
         # shard and its filename have come apart, which must not be averaged over.
@@ -72,8 +71,8 @@ function process_file(raw_path::String, proc_dir::String, label::String)
             error("$label: sim $(s.sim_index) has $(length(depths)) leaves, expected n = $(s.n)")
 
         push!(all_params,       s.params)
-        push!(all_mut_per_cell, compute_mut_per_cell(root))
-        push!(all_sfs,          compute_sfs(root, s.n))
+        push!(all_mut_per_cell, mutations_per_cell(root))
+        push!(all_sfs,          sitefrequencyspectrum(root, s.n))
         push!(all_leaf_depths,  depths)
     end
 

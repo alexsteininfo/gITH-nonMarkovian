@@ -8,7 +8,7 @@ using Distributions
 # omega = 2*mu throughout, where mu is the per-division mutation rate.
 # The factor of 2 arises because the formula counts mutations on ALL branches
 # of the phylogenetic tree — both internal branches (shared mutations, k≥2) and
-# leaf branches (private mutations, k=1).  compute_sfs fills sfs[1] from the
+# leaf branches (private mutations, k=1).  sitefrequencyspectrum fills sfs[1] from the
 # leaf branches too, so empirical and theoretical spectra are directly
 # comparable at every k, including k=1.
 #

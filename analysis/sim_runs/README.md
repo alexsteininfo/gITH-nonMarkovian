@@ -122,7 +122,7 @@ non-decreasing — no deleterious mutations. At `s = 0` the rule reduces to `f �
 | Extinction | `restart_on_extinction = true`, `n_restarts` recorded per sim |
 
 There is **no separate neutral channel**: the same mutations carrying the fitness effects
-are the ones `compute_sfs` and `compute_mut_per_cell` count. `ν = 1.0` here, not the neutral
+are the ones `sitefrequencyspectrum` and `mutations_per_cell` count. `ν = 1.0` here, not the neutral
 runs' 2.0 — at `ν = 2` lineages pile onto the cap and fitness *differences* collapse.
 `trajectory_dt = 0.02` rather than 0.1 because higher fitness reaches `N_target` much sooner
 in simulation time.

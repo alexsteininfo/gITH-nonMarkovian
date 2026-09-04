@@ -4,8 +4,6 @@
 # Requires, from the caller: `using MutationLoadDynamics` and `SubsampleResult`
 # (helpers/types_subsampled.jl) plus the scenario's params types.
 
-using AbstractTrees
-using Random
 using Serialization
 
 # ── Atomic writes ─────────────────────────────────────────────────────────────

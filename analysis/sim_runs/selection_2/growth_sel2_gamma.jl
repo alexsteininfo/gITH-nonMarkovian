@@ -16,8 +16,8 @@ using Random
 #
 # so `s` is the mean per-mutation selection coefficient and `a = EFFECT_SHAPE` sets
 # only its spread (CV = 1/√a). There is no separate neutral channel: the same
-# mutations that carry the fitness effects are the ones `compute_sfs` and
-# `compute_mut_per_cell` count.
+# mutations that carry the fitness effects are the ones `sitefrequencyspectrum` and
+# `mutations_per_cell` count.
 #
 # ν = 1.0, not the neutral runs' 2.0. At ν = 2 a lineage accumulates ~27 mutations by
 # N = 10000 and the population piles onto the cap, collapsing fitness *differences*

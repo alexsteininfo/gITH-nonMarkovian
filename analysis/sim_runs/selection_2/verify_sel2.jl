@@ -15,7 +15,6 @@ const HELPERS = joinpath(dirname(dirname(@__DIR__)), "helpers")
 include(joinpath(HELPERS, "types.jl"))
 include(joinpath(HELPERS, "types_selection2.jl"))
 include(joinpath(HELPERS, "selection2.jl"))
-include(joinpath(HELPERS, "tree_analysis.jl"))
 
 # Small N throughout: these checks are about mechanism, not statistics, so the whole
 # file runs in seconds. Run as:
@@ -137,8 +136,8 @@ end
     again = run_sel2_once(gamma_birth(5.0, 1.0), gamma_death(5.0, 0.5), p)
     @test length(collect(Leaves(again.tree_root))) ==
           length(collect(Leaves(r.tree_root)))
-    @test sort(compute_mut_per_cell(again.tree_root)) ==
-          sort(compute_mut_per_cell(r.tree_root))
+    @test sort(mutations_per_cell(again.tree_root)) ==
+          sort(mutations_per_cell(r.tree_root))
     @test [n.data.fitness for n in Leaves(again.tree_root)] == fits
 end
 
@@ -168,7 +167,7 @@ end
 
     @test popsize(pop) == length(collect(Leaves(r.tree_root)))
     @test pop.t === endtime(r.tree_root) || pop.t > 0.0
-    @test sort(mutations_per_cell(pop)) == sort(compute_mut_per_cell(r.tree_root))
+    @test sort(mutations_per_cell(pop)) == sort(mutations_per_cell(r.tree_root))
     @test all(==(1.0), [n.data.fitness for n in Leaves(r.tree_root)])
 end
 
@@ -180,7 +179,7 @@ end
     # and the population overshoots to the next power of two — the neutral behaviour.
     r0 = run_sel2_once(birth, death,
                        sel2_params(k = Inf, N = 512, model = :deterministic, s = 0.0))
-    d0 = compute_leaf_depths(r0.tree_root)
+    d0 = leaf_depths(r0.tree_root)
     @test length(d0) == 512
     @test all(==(9), d0)                       # log2(512)
     @test r0.n_restarts == 0                   # no death, so no extinction
@@ -189,7 +188,7 @@ end
     # longer balanced. A deterministic claim, not a statistical one.
     r1 = run_sel2_once(birth, death,
                        sel2_params(k = Inf, N = 512, model = :deterministic, s = 0.2))
-    d1 = compute_leaf_depths(r1.tree_root)
+    d1 = leaf_depths(r1.tree_root)
     @test !all(==(first(d1)), d1)
     @test mean(d1) > mean(d0)                  # imbalance lengthens external paths
     @test maximum(n.data.fitness for n in Leaves(r1.tree_root)) <= 10.0
