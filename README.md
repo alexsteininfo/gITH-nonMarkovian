@@ -49,11 +49,13 @@ This repo has its own Julia environment (`Project.toml`/`Manifest.toml`) with
 **`MutationLoadDynamics.jl` v0.3.0 or newer** added as a local **dev** dependency
 (`Pkg.develop`), so it always tracks the working copy at
 `/Users/alexanderstein/Documents/GitHub/MutationLoadDynamics.jl` rather than a
-released version. The version floor is not optional: leaf sampling
-(`sample_leaves`, `sample_trees`) and the tree statistics (`sitefrequencyspectrum`,
-`leaf_depths`, `branch_spectrum`, `filtered_mutations_per_cell`, `leaf_fitness`)
-all live in the package now, and every processing and subsampling stage calls them.
-To instantiate on a fresh clone or another machine:
+released version. The version floor is not optional: `sample_leaves`,
+`mutations_per_cell`, `sitefrequencyspectrum`, `leaf_depths` and `leaf_fitness` all
+live in the package now, and the processing and subsampling stages call them (the
+package also provides `sample_trees`, `branch_spectrum` and
+`filtered_mutations_per_cell`, promoted with the rest of the family but not yet
+called anywhere in this repo). To instantiate on a fresh clone or another
+machine:
 
 ```julia
 using Pkg
