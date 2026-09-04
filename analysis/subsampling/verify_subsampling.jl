@@ -134,7 +134,8 @@ end
     burden_of = Dict(4 => 8, 5 => 9, 3 => 12)
 
     @testset "n = N_full reproduces the source tree exactly" begin
-        sub, ids, N_full = subsample_tree(full, 3, UInt64(1))
+        _s = sample_leaves(full, 3; seed = UInt64(1))
+        sub, ids, N_full = _s.root, _s.sampled_ids, _s.N_full
         @test N_full == 3
         @test sort(ids) == [3, 4, 5]
         @test compute_sfs(sub, 3)       == full_sfs
@@ -146,7 +147,8 @@ end
     @testset "single-cell samples over many seeds" begin
         drawn = Int64[]
         for s in UInt64(1):UInt64(30)
-            sub, ids, N_full = subsample_tree(full, 1, s)
+            _s = sample_leaves(full, 1; seed = s)
+            sub, ids, N_full = _s.root, _s.sampled_ids, _s.N_full
             @test N_full == 3
             @test length(ids) == 1
             append!(drawn, ids)
@@ -173,7 +175,8 @@ end
         # whenever both sampled cells sit under L, sfs[2] must carry L's mutation
         seen = false
         for s in UInt64(1):UInt64(60)
-            sub, ids, _ = subsample_tree(full, 2, s)
+            _s = sample_leaves(full, 2; seed = s)
+            sub, ids, _ = _s.root, _s.sampled_ids, _s.N_full
             @test sort([l.data.id for l in Leaves(sub)]) == sort(ids)
             sfs = compute_sfs(sub, 2)
             @test sum(k * sfs[k] for k in 1:2) == sum(compute_mut_per_cell(sub))
@@ -186,8 +189,10 @@ end
     end
 
     @testset "determinism and bounds" begin
-        a, ids_a, _ = subsample_tree(full, 2, UInt64(42))
-        b, ids_b, _ = subsample_tree(full, 2, UInt64(42))
+        _sa = sample_leaves(full, 2; seed = UInt64(42))
+        a, ids_a, _ = _sa.root, _sa.sampled_ids, _sa.N_full
+        _sb = sample_leaves(full, 2; seed = UInt64(42))
+        b, ids_b, _ = _sb.root, _sb.sampled_ids, _sb.N_full
         @test ids_a == ids_b
         @test compute_sfs(a, 2) == compute_sfs(b, 2)
 
@@ -195,25 +200,27 @@ end
         # different draw. Seeds 42 and 2 were confirmed by hand to land on different
         # pairs of the fixture's 3 leaves ([3, 5] vs [3, 4]), so this cannot flake on
         # an unlucky coincidence of seed and fixture.
-        c, ids_c, _ = subsample_tree(full, 2, UInt64(2))
+        _sc = sample_leaves(full, 2; seed = UInt64(2))
+        c, ids_c, _ = _sc.root, _sc.sampled_ids, _sc.N_full
         @test sort(ids_a) == [3, 5]
         @test sort(ids_c) == [3, 4]
         @test sort(ids_a) != sort(ids_c)
 
-        @test_throws ErrorException subsample_tree(full, 4, UInt64(1))
-        @test_throws ErrorException subsample_tree(full, 0, UInt64(1))
+        @test_throws ArgumentError sample_leaves(full, 4; seed = UInt64(1))
+        @test_throws ArgumentError sample_leaves(full, 0; seed = UInt64(1))
     end
 
     @testset "the source tree is not mutated" begin
-        subsample_tree(full, 1, UInt64(3))
-        subsample_tree(full, 2, UInt64(4))
+        sample_leaves(full, 1; seed = UInt64(3))
+        sample_leaves(full, 2; seed = UInt64(4))
         @test compute_sfs(full, 3)       == full_sfs
         @test compute_mut_per_cell(full) == full_mpc
         @test compute_leaf_depths(full)  == full_depths
     end
 
     @testset "parent links in the rebuilt tree" begin
-        sub, _, _ = subsample_tree(full, 2, UInt64(7))
+        _s = sample_leaves(full, 2; seed = UInt64(7))
+        sub, _, _ = _s.root, _s.sampled_ids, _s.N_full
         @test isnothing(sub.parent)
         for node in PreOrderDFS(sub)
             isnothing(node.left)  || @test node.left.parent  === node
@@ -278,7 +285,8 @@ end
             for j in 1:3
                 i    = kept[j]
                 root = sims[i].tree_root
-                sub, ids, N_full = subsample_tree(root, 1_000, UInt64(j))
+                _s = sample_leaves(root, 1_000; seed = UInt64(j))
+                sub, ids, N_full = _s.root, _s.sampled_ids, _s.N_full
                 @test N_full == 1_000
                 @test sort(ids) == sort([l.data.id for l in Leaves(root)])
                 @test compute_sfs(sub, N_full)  == ref_sfs[j]
@@ -294,7 +302,8 @@ end
                 depth = id_depth_map(root)
                 burden = id_burden_map(root)
 
-                sub, ids, N_full = subsample_tree(root, 100, sample_seed(stem, i, 100))
+                _s = sample_leaves(root, 100; seed = sample_seed(stem, i, 100))
+                sub, ids, N_full = _s.root, _s.sampled_ids, _s.N_full
                 @test N_full == 1_000
                 @test length(ids) == 100
                 @test length(unique(ids)) == 100                  # without replacement
