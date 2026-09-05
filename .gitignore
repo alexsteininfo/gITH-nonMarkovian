@@ -1,8 +1,10 @@
-# Simulation output — regenerable from analysis/sim_runs + analysis/processing,
-# and too large for GitHub (multi-GB of serialized .jls files).
+# Simulation data (too large for GitHub)
 data/
 
-# Local-only project notes for Claude Code.
+# Local-only theory notes
+theory/
+
+# Local-only project notes for Claude Code
 CLAUDE.md
 .claude
 docs/
