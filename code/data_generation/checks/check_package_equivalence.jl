@@ -17,7 +17,7 @@
 # Exits non-zero on any mismatch. A mismatch means Phase A is wrong; it never
 # means the data should be regenerated.
 #
-# Run: julia --project=. analysis/checks/check_package_equivalence.jl
+# Run: julia --project=. -t auto code/data_generation/checks/check_package_equivalence.jl
 
 using Pkg
 const ROOT = dirname(dirname(dirname(@__DIR__)))

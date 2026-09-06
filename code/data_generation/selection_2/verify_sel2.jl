@@ -35,11 +35,12 @@ sel2_params(; d = 0.0, k = 5.0, nu = 1.0, N = 500, model = :gamma, s = 0.1,
 
 @testset "environment resolution" begin
     # The recurring bug in this repo: one `dirname` short, silently activating the
-    # wrong environment. Three `dirname`s from analysis/sim_runs/selection_2 must
-    # land on the repo root, and the helpers must be two `dirname`s away.
+    # wrong environment. The header computes ROOT three `dirname`s up from this
+    # script and asserts it holds a Project.toml, so a moved script fails
+    # immediately rather than silently activating the wrong environment.
     @test Base.active_project() == joinpath(ROOT, "Project.toml")
     @test isfile(joinpath(HELPERS, "types_selection2.jl"))
-    @test isdir(joinpath(ROOT, "analysis", "sim_runs", "selection_2"))
+    @test isdir(joinpath(ROOT, "code", "data_generation", "selection_2"))
 end
 
 @testset "types round-trip through Serialization" begin

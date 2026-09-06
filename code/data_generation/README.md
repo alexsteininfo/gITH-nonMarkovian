@@ -1,7 +1,13 @@
-# Simulation runs
+# Data generation
 
-Stage 1 of the pipeline: grow populations, keep the full lineage tree, serialize to
-`data/raw/`. Stage 2 is `code/data_generation/processing/`, stage 3 is `code/theory_plots/`.
+`code/data_generation/` covers stages 1, 2, 1b and 2b of the pipeline described in
+`CLAUDE.md`: grow populations and keep their full lineage trees (`neutral/`,
+`selection_1/`, `selection_2/`), extract observable arrays from those trees
+(`processing/`), draw uniform `n`-cell subsamples of each tree (`subsampling/`), and
+recompute the same observables on the subsampled trees (`processing_subsampled/`).
+`checks/` holds the gate that verifies this repo's local tree statistics still agree
+with what `MutationLoadDynamics.jl` computes. Stage 3 (aggregation and plotting
+against the closed-form theory) is `code/theory_plots/`.
 
 Everything here runs through **MutationLoadDynamics.jl** — unregistered, under active
 development, and `Pkg.develop`ed from a local path (`../MutationLoadDynamics.jl` alongside
@@ -15,10 +21,27 @@ julia --project=. -t auto code/data_generation/<scenario>/<script>.jl
 ```
 
 `-t auto` matters — every script parallelises with `Threads.@threads` and does nothing
-useful single-threaded. The explicit `--project` does not rescue a wrong `Pkg.activate`
-inside a script, which computes the repo root by climbing `dirname(@__DIR__)`; from a
-`data_generation/<scenario>/` subdirectory that is **three** `dirname` calls to the root, **two**
-to `code/`, and **three** `".."` segments to `data/`.
+useful single-threaded.
+
+Every script under `code/` sits three directories below the repo root (e.g.
+`code/data_generation/<scenario>/<script>.jl`) and opens with an identical six-line
+header:
+
+```julia
+using Pkg
+const ROOT = dirname(dirname(dirname(@__DIR__)))
+isfile(joinpath(ROOT, "Project.toml")) ||
+    error("ROOT = $ROOT has no Project.toml — was this script moved?")
+Pkg.activate(ROOT)
+include(joinpath(ROOT, "code", "paths.jl"))
+```
+
+`ROOT` is climbed three `dirname`s and *asserted* to hold a `Project.toml` before
+`Pkg.activate` runs; `code/paths.jl` then defines `DATA`, `PLOTS`, and `HELPERS` from
+that same `ROOT`. No script counts directory levels to reach `data/` or `plots/` any
+more, so a script moved to the wrong depth fails loudly at the assertion instead of
+silently activating the wrong environment or writing to the wrong place — the
+recurring bug in the previous layout.
 
 `data/` is gitignored and fully regenerable from these scripts.
 
@@ -127,6 +150,78 @@ runs' 2.0 — at `ν = 2` lineages pile onto the cap and fitness *differences* c
 `trajectory_dt = 0.02` rather than 0.1 because higher fitness reaches `N_target` much sooner
 in simulation time.
 
+## `processing/` — stage 2: full-tree observables
+
+One script per scenario. Each deserializes the stage-1 raw trees for that scenario and
+walks them to extract the arrays everything downstream consumes, one quantity per
+subdirectory under `data/processed/<scenario>/`:
+
+| | |
+|---|---|
+| Scripts | `process_neutral.jl`, `process_sel1.jl`, `process_sel2.jl` |
+| Quantities (all three) | `params`, `mut_per_cell`, `sfs`, `leaf_depths` |
+| Extra (`selection_1`) | `injection` — `Sel1Injection`: `t_inject`, `N_at_inject`, `driver_cell_id`, `driver_clone_size`, `n_attempts`, `seed` |
+| Extra (`selection_2`) | `leaf_fitness`, `n_restarts` |
+
+`process_sel1.jl` and `process_sel2.jl` skip a raw file once every one of its quantity
+files already exists under `data/processed/`, so an interrupted run resumes and a forced
+redo is a file deletion. **`process_neutral.jl` has no such guard** — `process_file` there
+serializes unconditionally, with no per-shard `isfile` check at all — so re-running it
+rewrites all 433 MB of `data/processed/neutral/`. **Never run `process_neutral.jl`, or its
+port, to "check" something**; there is nothing it skips.
+
+## `subsampling/` — stage 1b: uniform subsamples
+
+For each full tree, draws `n` of its `N` leaf cells uniformly without replacement and
+serializes the *induced* tree — the sampled leaves plus every ancestor of a sampled leaf,
+with unary nodes retained rather than collapsed — to `data/raw_subsampled/<scenario>/`.
+Retaining every ancestor is what makes a sampled cell's `mut_per_cell`/`leaf_depths` in
+stage 2b identical to its full-tree value; see `theory/sfs.md` and `helpers/subsampling.jl`
+for why, and `sample_sizes` in that file for the fixed `N_target -> [n, ...]` table (adding
+a population size means adding a row there, not computing one).
+
+| | |
+|---|---|
+| Scripts | `subsample_neutral.jl`, `subsample_sel1.jl`, `subsample_sel2.jl` |
+| Tests | `verify_subsampling.jl` — unit suite; its strongest check draws `n = N_full` and asserts the result reproduces `data/processed/` exactly |
+| Audit | `inventory_subsampled.jl` — rebuilds every expected filename from the parameter grids and compares against disk (`--deep` additionally reads every file back) |
+
+Writes are atomic (write to `<path>.tmp`, then rename) so an interrupted run cannot leave
+a truncated file that a later run mistakes for "already done".
+
+## `processing_subsampled/` — stage 2b: observables from the subsamples
+
+The same quantities `processing/` extracts, recomputed on the subsampled trees, into
+`data/processed_subsampled/<scenario>/`. `sfs` is the quantity sampling genuinely
+distorts (see `theory/sfs.md`'s hypergeometric projection); `mut_per_cell` and
+`leaf_depths` are unchanged from the full-tree values for the same cells, by
+construction of stage 1b.
+
+| | |
+|---|---|
+| Scripts | `process_neutral_subsampled.jl`, `process_sel1_subsampled.jl`, `process_sel2_subsampled.jl` |
+| Cross-check | `check_neutral_subsampled.jl` — asserts the subsampled arrays against the full-tree arrays they are co-indexed with; there is no `sel1`/`sel2` equivalent yet (see `TODO.md`) |
+
+**`process_sel1_subsampled.jl` and `process_sel2_subsampled.jl` require
+`processing/process_sel1.jl` and `processing/process_sel2.jl`, respectively, to have run
+first.** Each copies its scenario's per-simulation scalars (`injection` for `sel1`,
+`n_restarts` for `sel2`) across from `data/processed/` rather than re-deriving them from
+the raw trees — re-deriving would mean a second full pass over several GB of trees for a
+handful of numbers per simulation. Both hard-error, naming the required script, if those
+inputs are missing or misaligned.
+
+## `checks/` — cross-package equivalence gate
+
+`check_package_equivalence.jl` is the gate that verifies this repo's own tree-statistics
+helpers and sampler still agree with what `MutationLoadDynamics.jl` produces, so far
+enough into the package's development that the local implementations they replaced could
+be retired. It runs two testsets against real data: does the package's tree-statistics
+code return exactly what `helpers/tree_analysis.jl` returns, element for element and in
+the same order (`data/processed/`), and does the package's sampler reproduce the draws
+already serialized under `data/raw_subsampled/`. It exits non-zero on any mismatch; a
+mismatch means the package integration is wrong, never that the data should be
+regenerated.
+
 ## Auditing a completed sweep
 
 ```bash
@@ -171,8 +266,16 @@ write nothing to `data/`.
 
 ## `selection_old/`
 
-Superseded first pass at selection: four fitness models (additive, max-random, and two
-multiplicative) swept over `s ∈ 0.0:0.1:0.5` at 50 sims each. Kept for reference —
-`selection_2/` replaces `growth_multi_rand.jl` with a normalised effect distribution.
-Don't extend it, and don't use it as a template: both its `include` and its output path are
-one segment short, so it activates the wrong environment and writes to `analysis/data/`.
+Superseded first pass at selection (four fitness models — additive, max-random, and two
+multiplicative — swept over `s ∈ 0.0:0.1:0.5` at 50 sims each). Not ported to `code/`: it
+remains at `analysis/sim_runs/selection_old/` and will be deleted along with the rest of
+`analysis/`. Don't use it as a template: both its `include` and its output path are one
+segment short, so it activates the wrong environment and writes to `analysis/data/`.
+
+## A note on `analysis/` references
+
+Comments and docstrings under `code/` still name `analysis/` paths in a few dozen places
+— provenance notes such as "mirrors `analysis/processing/process_sel1.jl`" and the like.
+They are accurate while both trees exist, since the scripts they annotate really were
+ported from those originals, and are left alone deliberately. They should be swept in the
+same change that deletes `analysis/` and updates `README.md`/`CLAUDE.md`.

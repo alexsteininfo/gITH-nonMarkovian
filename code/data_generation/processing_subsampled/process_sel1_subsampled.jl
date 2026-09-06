@@ -56,13 +56,13 @@ function process_file(raw_path::String, proc_dir::String, full_injection_path::S
     end
 
     isfile(full_injection_path) ||
-        error("$label: missing $full_injection_path — run analysis/processing/process_sel1.jl first")
+        error("$label: missing $full_injection_path — run code/data_generation/processing/process_sel1.jl first")
 
     # The full-tree params array lives alongside injection, with "params" substituted
     # for the quantity name.
     full_params_path = replace(full_injection_path, "injection" => "params")
     isfile(full_params_path) ||
-        error("$label: missing $full_params_path — run analysis/processing/process_sel1.jl first")
+        error("$label: missing $full_params_path — run code/data_generation/processing/process_sel1.jl first")
 
     println("  Processing: $(basename(raw_path))")
 
