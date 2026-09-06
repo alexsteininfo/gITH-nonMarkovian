@@ -15,7 +15,8 @@
 
 const REPO = dirname(dirname(@__DIR__))
 
-const PATH_CONST = r"^\s*const\s+(RAW|PROC|OUT|OUTDIR)\s*=\s*(joinpath\(.*)$"
+const PATH_CONST = r"^\s*const\s+([A-Z_][A-Z_0-9]*)\s*=\s*(joinpath\(.*)$"
+const SKIP_NAMES = Set(["ROOT", "DATA", "PLOTS", "HELPERS"])
 
 """Return Dict(name => resolved absolute path) for one file."""
 function resolve_paths(file::String)
@@ -25,12 +26,15 @@ function resolve_paths(file::String)
         m = match(PATH_CONST, line)
         isnothing(m) && continue
         name, expr = m.captures[1], m.captures[2]
-        # Bind the free names textually, then evaluate the joinpath call.
+        name in SKIP_NAMES && continue
+        # Bind the free names textually (word-boundary aware, so a name like
+        # RAW_ROOT is not corrupted by the ROOT substitution), then evaluate
+        # the joinpath call.
         expr = replace(expr,
-            "@__DIR__" => repr(dir),
-            "DATA"     => repr(joinpath(REPO, "data")),
-            "PLOTS"    => repr(joinpath(REPO, "plots")),
-            "ROOT"     => repr(REPO))
+            "@__DIR__"    => repr(dir),
+            r"\bDATA\b"   => repr(joinpath(REPO, "data")),
+            r"\bPLOTS\b"  => repr(joinpath(REPO, "plots")),
+            r"\bROOT\b"   => repr(REPO))
         out[name] = normpath(abspath(eval(Meta.parse(expr))))
     end
     return out

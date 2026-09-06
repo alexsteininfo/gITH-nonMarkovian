@@ -6,8 +6,9 @@
 #
 # Two independent checks:
 #   1. Body diff. Strip every line that is allowed to change (the header, local
-#      ROOT/HELPERS definitions, includes, and the RAW/PROC/OUT constants) plus
-#      blank lines, from BOTH files, then diff. The remainder must be identical.
+#      ROOT/HELPERS/DATA/PLOTS definitions, includes, and any all-caps
+#      `const NAME = joinpath(...)` path constant) plus blank lines, from BOTH
+#      files, then diff. The remainder must be identical.
 #   2. Include set. Because check 1 strips include lines wholesale, it cannot see
 #      a DROPPED include. So compare the set of included basenames separately.
 #
@@ -24,7 +25,7 @@ strip_paths() {
   | grep -vE '^[[:space:]]*isfile\(joinpath\(ROOT,' \
   | grep -vE '^[[:space:]]*error\("ROOT = ' \
   | grep -vE '^[[:space:]]*include\(joinpath\(' \
-  | grep -vE '^[[:space:]]*const[[:space:]]+(RAW|PROC|OUT|OUTDIR)[[:space:]]*='
+  | grep -vE '^[[:space:]]*const[[:space:]]+[A-Z_][A-Z_0-9]*[[:space:]]*=[[:space:]]*joinpath\('
 }
 
 # Included basenames, sorted — order of includes may legitimately change.
