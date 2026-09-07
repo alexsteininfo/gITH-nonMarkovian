@@ -33,13 +33,13 @@ const SIMS_PER_SHARD = 1
 # ── Seeding ───────────────────────────────────────────────────────────────────
 
 """
-    cn_seed(stem, sim_index) -> UInt64
+    cn_seed(stem, sim_index) -> Int64
 
 Seed for one simulation's copy-number evolution. A pure function of values already
 recorded in the raw_subsampled filename (`stem`) and the `SubsampleResult` itself
-(`sim_index`), so any run reproduces exactly.
+(`sim_index`), so any run reproduces exactly. The hash is masked to fit in Int64.
 """
-cn_seed(stem::AbstractString, sim_index::Int) = hash((stem, sim_index, :cn_evolution))
+cn_seed(stem::AbstractString, sim_index::Int) = Int64(hash((stem, sim_index, :cn_evolution)) & typemax(Int64))
 
 # ── Per-simulation driver ────────────────────────────────────────────────────
 
