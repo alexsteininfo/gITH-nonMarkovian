@@ -1,11 +1,12 @@
 # Data generation
 
-`code/data_generation/` covers stages 1, 2, 1b and 2b of the pipeline described in
+`code/data_generation/` covers stages 1, 2, 1b, 2b and 4 of the pipeline described in
 `CLAUDE.md`, numbered by stage: grow populations and keep their full lineage trees
 (`1_simulation_runs/neutral/`, `1_simulation_runs/selection_1/`,
 `1_simulation_runs/selection_2/`), draw uniform `n`-cell subsamples of each tree
-(`2_subsampling/`), and extract observable arrays from both the full trees
-(`3_processing/full_trees/`) and the subsampled trees (`3_processing/subsampled_trees/`).
+(`2_subsampling/`), extract observable arrays from both the full trees
+(`3_processing/full_trees/`) and the subsampled trees (`3_processing/subsampled_trees/`),
+and simulate copy-number alterations on the subsampled trees (`4_cn_evolution/`).
 `3_processing/checks/` holds the gate that verifies this repo's local tree statistics
 still agree with what `MutationLoadDynamics.jl` computes. Stage 3 (aggregation and
 plotting against the closed-form theory) is `code/theory_plots/` — an unrelated "stage 3"
@@ -23,16 +24,19 @@ change, check that repo for API drift before assuming the bug is local. Run from
 julia --project=. -t auto code/data_generation/1_simulation_runs/<scenario>/<script>.jl
 julia --project=. -t auto code/data_generation/2_subsampling/<script>.jl
 julia --project=. -t auto code/data_generation/3_processing/<full_trees|subsampled_trees|checks>/<script>.jl
+julia --project=. code/data_generation/4_cn_evolution/<script>.jl
 ```
 
-`-t auto` matters — every script parallelises with `Threads.@threads` and does nothing
-useful single-threaded.
+`-t auto` matters for every script under `1_simulation_runs/`, `2_subsampling/` and
+`3_processing/` — they parallelise with `Threads.@threads` and do nothing useful
+single-threaded. The `4_cn_evolution/` scripts are single-threaded — `-t auto` is
+harmless but unnecessary for them.
 
 Every script opens with an identical six-line header, differing only in how many
 `dirname`s climb back to the repo root: four for anything under `1_simulation_runs/`
 or `3_processing/` (one scenario/kind subfolder below `data_generation/`), three for
-`2_subsampling/` (files sit directly in it, same depth as before it was renamed from
-`subsampling/`):
+`2_subsampling/` and `4_cn_evolution/` (files sit directly in them, same depth as
+before the folder structures were reorganized):
 
 ```julia
 using Pkg
@@ -254,7 +258,7 @@ CNA count, one for one.
 | Sims per shard | 1 (`SIMS_PER_SHARD` in `cn_evolution.jl`) — raise later; resumable, so raising it only adds work |
 | Shards in scope | 158: 14 neutral (all models) + 120 sel1-gamma + 24 sel2-gamma |
 | Output | `data/CN_subsampled/<scenario>/<model>/<stem>/sim<sim_index>_{cells.tsv,truth_profiles.tsv,truth_events.tsv,tree.nwk}` |
-| Disk | ≈ 1.6 GB |
+| Disk | 2.1 GB measured (1.6 GB of it `cells.tsv`) |
 
 `selection_1`/`selection_2`'s deterministic and markov models are not yet run —
 deferred for disk/runtime reasons during design, not a modelling choice. Adding
