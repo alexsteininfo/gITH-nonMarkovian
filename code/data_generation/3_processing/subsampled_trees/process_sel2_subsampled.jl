@@ -1,5 +1,5 @@
 using Pkg
-const ROOT = dirname(dirname(dirname(@__DIR__)))
+const ROOT = dirname(dirname(dirname(dirname(@__DIR__))))
 isfile(joinpath(ROOT, "Project.toml")) ||
     error("ROOT = $ROOT has no Project.toml — was this script moved?")
 Pkg.activate(ROOT)
@@ -49,13 +49,13 @@ function process_file(raw_path::String, proc_dir::String, full_restarts_path::St
     end
 
     isfile(full_restarts_path) ||
-        error("$label: missing $full_restarts_path — run code/data_generation/processing/process_sel2.jl first")
+        error("$label: missing $full_restarts_path — run code/data_generation/3_processing/full_trees/process_sel2.jl first")
 
     # The full-tree params array lives alongside n_restarts, with "params"
     # substituted for the quantity name.
     full_params_path = replace(full_restarts_path, "n_restarts" => "params")
     isfile(full_params_path) ||
-        error("$label: missing $full_params_path — run code/data_generation/processing/process_sel2.jl first")
+        error("$label: missing $full_params_path — run code/data_generation/3_processing/full_trees/process_sel2.jl first")
 
     println("  Processing: $(basename(raw_path))")
 

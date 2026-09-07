@@ -1,5 +1,5 @@
 using Pkg
-const ROOT = dirname(dirname(dirname(@__DIR__)))
+const ROOT = dirname(dirname(dirname(dirname(@__DIR__))))
 isfile(joinpath(ROOT, "Project.toml")) ||
     error("ROOT = $ROOT has no Project.toml — was this script moved?")
 Pkg.activate(ROOT)

@@ -1,13 +1,16 @@
 # Data generation
 
 `code/data_generation/` covers stages 1, 2, 1b and 2b of the pipeline described in
-`CLAUDE.md`: grow populations and keep their full lineage trees (`neutral/`,
-`selection_1/`, `selection_2/`), extract observable arrays from those trees
-(`processing/`), draw uniform `n`-cell subsamples of each tree (`subsampling/`), and
-recompute the same observables on the subsampled trees (`processing_subsampled/`).
-`checks/` holds the gate that verifies this repo's local tree statistics still agree
-with what `MutationLoadDynamics.jl` computes. Stage 3 (aggregation and plotting
-against the closed-form theory) is `code/theory_plots/`.
+`CLAUDE.md`, numbered by stage: grow populations and keep their full lineage trees
+(`1_simulation_runs/neutral/`, `1_simulation_runs/selection_1/`,
+`1_simulation_runs/selection_2/`), draw uniform `n`-cell subsamples of each tree
+(`2_subsampling/`), and extract observable arrays from both the full trees
+(`3_processing/full_trees/`) and the subsampled trees (`3_processing/subsampled_trees/`).
+`3_processing/checks/` holds the gate that verifies this repo's local tree statistics
+still agree with what `MutationLoadDynamics.jl` computes. Stage 3 (aggregation and
+plotting against the closed-form theory) is `code/theory_plots/` — an unrelated "stage 3"
+name collision with `3_processing/`; the numbering here is purely about ordering within
+`data_generation/`.
 
 Everything here runs through **MutationLoadDynamics.jl** — unregistered, under active
 development, and `Pkg.develop`ed from a local path (`../MutationLoadDynamics.jl` alongside
@@ -17,31 +20,38 @@ change, check that repo for API drift before assuming the bug is local. Run from
 **repo root**:
 
 ```bash
-julia --project=. -t auto code/data_generation/<scenario>/<script>.jl
+julia --project=. -t auto code/data_generation/1_simulation_runs/<scenario>/<script>.jl
+julia --project=. -t auto code/data_generation/2_subsampling/<script>.jl
+julia --project=. -t auto code/data_generation/3_processing/<full_trees|subsampled_trees|checks>/<script>.jl
 ```
 
 `-t auto` matters — every script parallelises with `Threads.@threads` and does nothing
 useful single-threaded.
 
-Every script under `code/` sits three directories below the repo root (e.g.
-`code/data_generation/<scenario>/<script>.jl`) and opens with an identical six-line
-header:
+Every script opens with an identical six-line header, differing only in how many
+`dirname`s climb back to the repo root: four for anything under `1_simulation_runs/`
+or `3_processing/` (one scenario/kind subfolder below `data_generation/`), three for
+`2_subsampling/` (files sit directly in it, same depth as before it was renamed from
+`subsampling/`):
 
 ```julia
 using Pkg
-const ROOT = dirname(dirname(dirname(@__DIR__)))
+const ROOT = dirname(dirname(dirname(dirname(@__DIR__))))  # 2_subsampling/ uses one less dirname
 isfile(joinpath(ROOT, "Project.toml")) ||
     error("ROOT = $ROOT has no Project.toml — was this script moved?")
 Pkg.activate(ROOT)
 include(joinpath(ROOT, "code", "paths.jl"))
 ```
 
-`ROOT` is climbed three `dirname`s and *asserted* to hold a `Project.toml` before
-`Pkg.activate` runs; `code/paths.jl` then defines `DATA`, `PLOTS`, and `HELPERS` from
-that same `ROOT`. No script counts directory levels to reach `data/` or `plots/` any
-more, so a script moved to the wrong depth fails loudly at the assertion instead of
-silently activating the wrong environment or writing to the wrong place — the
-recurring bug in the previous layout.
+`ROOT` is *asserted* to hold a `Project.toml` before `Pkg.activate` runs; `code/paths.jl`
+then defines `DATA`, `PLOTS`, and `HELPERS` from that same `ROOT`. No script counts
+directory levels to reach `data/` or `plots/` any more, so a script moved to the wrong
+depth fails loudly at the assertion instead of silently activating the wrong environment
+or writing to the wrong place — the recurring bug in the previous layout, and the reason
+every file's `dirname` count had to be re-checked when this folder was restructured
+(2026-09-07: flat `neutral/`, `selection_1/`, `selection_2/`, `processing/`,
+`processing_subsampled/`, `subsampling/`, `checks/` became the numbered
+`1_simulation_runs/`, `2_subsampling/`, `3_processing/` tree above).
 
 `data/` is gitignored and fully regenerable from these scripts.
 
@@ -49,10 +59,10 @@ recurring bug in the previous layout.
 
 | Scenario | Timing models | Files | Sims | Disk | Audit |
 |---|---|---|---|---|---|
-| `neutral/` | deterministic, gamma, markov | 16 | 3 200 | 1.8 GB | — |
-| `selection_1/` | deterministic, gamma, markov | 280 | 14 000 | 6.9 GB | `INVENTORY OK` |
-| `selection_2/` | deterministic, gamma, markov | 56 | 11 200 | 4.9 GB | `INVENTORY OK` |
-| `selection_old/` | — | — | — | 733 MB | superseded |
+| `1_simulation_runs/neutral/` | deterministic, gamma, markov | 16 | 3 200 | 1.8 GB | — |
+| `1_simulation_runs/selection_1/` | deterministic, gamma, markov | 280 | 14 000 | 6.9 GB | `INVENTORY OK` |
+| `1_simulation_runs/selection_2/` | deterministic, gamma, markov | 56 | 11 200 | 4.9 GB | `INVENTORY OK` |
+| `selection_old/` (in `analysis/`) | — | — | — | 733 MB | superseded |
 
 ## Shared conventions
 
@@ -76,7 +86,7 @@ Held identical across all three live scenarios, so files pair up across scenario
   shared: Julia's `Serialization` resolves struct layout at deserialize time, so widening
   one struct would make every `.jls` already written against it unreadable.
 
-## `neutral/` — no selection
+## `1_simulation_runs/neutral/` — no selection
 
 Baseline. `ν = 2.0` neutral mutations per daughter per division, `driver_dist = Dirac(0.0)`
 and `fitness_update = (f, δ) -> f`, so fitness stays exactly 1 and `ν` acts purely as the
@@ -94,7 +104,7 @@ mutation rate feeding the SFS and single-cell burden.
 parameterisation. `process_neutral.jl` reads only `N1024` and `N16384`; the other two are
 orphans.
 
-## `selection_1/` — exactly one driver, swept in strength and timing
+## `1_simulation_runs/selection_1/` — exactly one driver, swept in strength and timing
 
 One fitness-enhancing mutation per simulation, `f ← 1 + s`, applied to one daughter of the
 division that first takes the population from `N_critic` to `N_critic + 1` cells. Uses the
@@ -122,7 +132,7 @@ survival-and-establishment probability.
 
 Resumable — a shard that already exists is skipped, so delete it to force regeneration.
 
-## `selection_2/` — every mutation is a driver, capped
+## `1_simulation_runs/selection_2/` — every mutation is a driver, capped
 
 No injection and no retry loop. Each daughter draws `j ~ Poisson(ν)` mutations; each draws
 `X ~ Gamma(a, 1/a)` (mean 1) and updates
@@ -150,7 +160,7 @@ runs' 2.0 — at `ν = 2` lineages pile onto the cap and fitness *differences* c
 `trajectory_dt = 0.02` rather than 0.1 because higher fitness reaches `N_target` much sooner
 in simulation time.
 
-## `processing/` — stage 2: full-tree observables
+## `3_processing/full_trees/` — stage 2: full-tree observables
 
 One script per scenario. Each deserializes the stage-1 raw trees for that scenario and
 walks them to extract the arrays everything downstream consumes, one quantity per
@@ -170,7 +180,7 @@ serializes unconditionally, with no per-shard `isfile` check at all — so re-ru
 rewrites all 433 MB of `data/processed/neutral/`. **Never run `process_neutral.jl`, or its
 port, to "check" something**; there is nothing it skips.
 
-## `subsampling/` — stage 1b: uniform subsamples
+## `2_subsampling/` — stage 1b: uniform subsamples
 
 For each full tree, draws `n` of its `N` leaf cells uniformly without replacement and
 serializes the *induced* tree — the sampled leaves plus every ancestor of a sampled leaf,
@@ -189,9 +199,9 @@ a population size means adding a row there, not computing one).
 Writes are atomic (write to `<path>.tmp`, then rename) so an interrupted run cannot leave
 a truncated file that a later run mistakes for "already done".
 
-## `processing_subsampled/` — stage 2b: observables from the subsamples
+## `3_processing/subsampled_trees/` — stage 2b: observables from the subsamples
 
-The same quantities `processing/` extracts, recomputed on the subsampled trees, into
+The same quantities `full_trees/` extracts, recomputed on the subsampled trees, into
 `data/processed_subsampled/<scenario>/`. `sfs` is the quantity sampling genuinely
 distorts (see `theory/sfs.md`'s hypergeometric projection); `mut_per_cell` and
 `leaf_depths` are unchanged from the full-tree values for the same cells, by
@@ -203,14 +213,14 @@ construction of stage 1b.
 | Cross-check | `check_neutral_subsampled.jl` — asserts the subsampled arrays against the full-tree arrays they are co-indexed with; there is no `sel1`/`sel2` equivalent yet (see `TODO.md`) |
 
 **`process_sel1_subsampled.jl` and `process_sel2_subsampled.jl` require
-`processing/process_sel1.jl` and `processing/process_sel2.jl`, respectively, to have run
+`full_trees/process_sel1.jl` and `full_trees/process_sel2.jl`, respectively, to have run
 first.** Each copies its scenario's per-simulation scalars (`injection` for `sel1`,
 `n_restarts` for `sel2`) across from `data/processed/` rather than re-deriving them from
 the raw trees — re-deriving would mean a second full pass over several GB of trees for a
 handful of numbers per simulation. Both hard-error, naming the required script, if those
 inputs are missing or misaligned.
 
-## `checks/` — cross-package equivalence gate
+## `3_processing/checks/` — cross-package equivalence gate
 
 `check_package_equivalence.jl` is the gate that verifies this repo's own tree-statistics
 helpers and sampler still agree with what `MutationLoadDynamics.jl` produces, so far
@@ -225,8 +235,8 @@ regenerated.
 ## Auditing a completed sweep
 
 ```bash
-julia --project=. code/data_generation/selection_1/inventory_sel1.jl
-julia --project=. code/data_generation/selection_2/inventory_sel2.jl
+julia --project=. code/data_generation/1_simulation_runs/selection_1/inventory_sel1.jl
+julia --project=. code/data_generation/1_simulation_runs/selection_2/inventory_sel2.jl
 ```
 
 Each walks every shard and checks file counts, sims per file, replicate/cell uniqueness, and

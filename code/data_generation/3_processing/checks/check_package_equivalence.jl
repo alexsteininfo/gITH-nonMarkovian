@@ -17,10 +17,10 @@
 # Exits non-zero on any mismatch. A mismatch means Phase A is wrong; it never
 # means the data should be regenerated.
 #
-# Run: julia --project=. -t auto code/data_generation/checks/check_package_equivalence.jl
+# Run: julia --project=. -t auto code/data_generation/3_processing/checks/check_package_equivalence.jl
 
 using Pkg
-const ROOT = dirname(dirname(dirname(@__DIR__)))
+const ROOT = dirname(dirname(dirname(dirname(@__DIR__))))
 isfile(joinpath(ROOT, "Project.toml")) ||
     error("ROOT = $ROOT has no Project.toml — was this script moved?")
 Pkg.activate(ROOT)
