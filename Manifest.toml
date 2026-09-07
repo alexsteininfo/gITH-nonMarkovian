@@ -2,7 +2,7 @@
 
 julia_version = "1.12.1"
 manifest_format = "2.0"
-project_hash = "2787cb08a7bd669bc8e3d0f7c563f20f4ac8c19b"
+project_hash = "067d85a0a28134c97a53239d77a6d4d4aa8acafc"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -256,6 +256,16 @@ weakdeps = ["IntervalSets", "LinearAlgebra", "StaticArrays"]
 git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.3"
+
+[[deps.CopyNumberEvolution]]
+deps = ["Distributions", "Random", "StatsBase"]
+path = "/Users/alexanderstein/Documents/GitHub/CopyNumberEvolution.jl"
+uuid = "a7fad464-da36-487c-8111-789b46084000"
+version = "0.1.0"
+weakdeps = ["MutationLoadDynamics"]
+
+    [deps.CopyNumberEvolution.extensions]
+    CopyNumberEvolutionMutationLoadDynamicsExt = "MutationLoadDynamics"
 
 [[deps.CoreMath]]
 deps = ["CoreMath_jll"]

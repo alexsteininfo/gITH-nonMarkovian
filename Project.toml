@@ -1,6 +1,7 @@
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+CopyNumberEvolution = "a7fad464-da36-487c-8111-789b46084000"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 MutationLoadDynamics = "7b855ee6-6887-412f-a571-26d20a5a92d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -9,4 +10,5 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+CopyNumberEvolution = "0.1"
 MutationLoadDynamics = "0.3"
