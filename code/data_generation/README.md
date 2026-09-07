@@ -232,6 +232,41 @@ already serialized under `data/raw_subsampled/`. It exits non-zero on any mismat
 mismatch means the package integration is wrong, never that the data should be
 regenerated.
 
+## `4_cn_evolution/` — stage 4: copy-number evolution
+
+Simulates allele-specific copy-number alterations on the stage-1b subsampled
+trees with **CopyNumberEvolution.jl** (a separate, unregistered, actively
+developed package, `Pkg.develop`ed from `../CopyNumberEvolution.jl`), and writes
+MEDICC2-ready output plus ground truth to `data/CN_subsampled/`. Design rationale
+and every scoping decision below: `docs/superpowers/specs/2026-09-07-cn-evolution-design.md`.
+
+Model: `CNAModel(rate = FromEdgeMutations())` on `hg38(:female)` with 1Mb bins —
+every other component (target, extent, gain/loss, WGD, viability, root state) is
+the package default, which already means focal-only events and no WGD. The rate
+rule is exact identity: a tree edge's already-recorded mutation count becomes its
+CNA count, one for one.
+
+| | |
+|---|---|
+| Scripts | `cn_neutral.jl` (all 3 models), `cn_sel1.jl`, `cn_sel2.jl` (gamma only) |
+| Shared driver | `code/helpers/cn_evolution.jl` — model constants, seed fn, `cn_evolve_sim`/`cn_evolve_file` |
+| Source | `data/raw_subsampled/`, smallest sample size per shard family only (`n = 100/102/164`, never `1000`/`1638`) |
+| Sims per shard | 1 (`SIMS_PER_SHARD` in `cn_evolution.jl`) — raise later; resumable, so raising it only adds work |
+| Shards in scope | 158: 14 neutral (all models) + 120 sel1-gamma + 24 sel2-gamma |
+| Output | `data/CN_subsampled/<scenario>/<model>/<stem>/sim<sim_index>_{cells.tsv,truth_profiles.tsv,truth_events.tsv,tree.nwk}` |
+| Disk | ≈ 1.6 GB |
+
+`selection_1`/`selection_2`'s deterministic and markov models are not yet run —
+deferred for disk/runtime reasons during design, not a modelling choice. Adding
+them is a `markov`/`deterministic` loop in `cn_sel1.jl`/`cn_sel2.jl`, the same
+shape `subsample_sel1.jl`/`subsample_sel2.jl` already show.
+
+No `verify_*.jl`/`inventory_*.jl` yet — premature before `SIMS_PER_SHARD` and the
+1Mb resolution are validated against real usage. `medicc2` itself was not run
+against the output on the machine this stage was built on (not installed); the
+format was checked structurally instead (header line, autosome-only chrom column,
+copy numbers within MEDICC2's 0–8 range).
+
 ## Auditing a completed sweep
 
 ```bash
