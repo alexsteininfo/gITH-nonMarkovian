@@ -25,7 +25,7 @@ source(file.path(ROOT, "code", "paths.R"))
 source(file.path(HELPERS, "plotting_functions.R"))
 
 NWK_DIR <- file.path(DATA, "newick", "neutral")
-OUT_DIR <- file.path(FIGURES, "2_theory", "neutral")
+OUT_DIR <- file.path(FIGURES, "2_theory", "neutral", "trees")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
 ### Layout ---------------------------------------------------------------------
