@@ -88,10 +88,14 @@ struct PanelRow
     highlight_file::String
 end
 
+# t_end and root_edge carry the same 12 significant digits as the branch lengths in
+# the Newick files. R divides every node time by t_end, so rounding it — 6 decimals
+# was the first attempt — pushes the tips just past 1.0 and makes "the tips reach the
+# present" false at the precision the verifier checks. sampling_fraction is cosmetic.
 csv_line(r::PanelRow) = join((
     r.figure, r.model, r.d, r.sim_index, r.n_tips, r.N_pop,
-    round(r.sampling_fraction; digits = 6), round(r.t_end; digits = 6),
-    round(r.root_edge; digits = 6), r.median_leaf_depth, r.repeated,
+    round(r.sampling_fraction; digits = 6), _nwk_len(r.t_end),
+    _nwk_len(r.root_edge), r.median_leaf_depth, r.repeated,
     r.newick_file, r.highlight_file), ',')
 
 root_edge(root::BinaryNode{NonMarkovCell}) =
