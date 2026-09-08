@@ -38,6 +38,16 @@ function fixture_tree()
     return root
 end
 
+# ── Exported artefacts ────────────────────────────────────────────────────────
+#
+# The testsets below that read these require
+# `julia --project=. code/2_theory/neutral/export_trees_newick.jl` to have run.
+# That split is the point: the checks are cheap, the export is not.
+
+const NWK_DIR = joinpath(DATA, "newick", "neutral")
+
+panel_rows() = [split(l, ',') for l in readlines(joinpath(NWK_DIR, "panels.csv"))[2:end]]
+
 @testset "tree export" begin
 
 @testset "newick_string on the fixture" begin
@@ -68,6 +78,50 @@ end
     write_newick(path, fixture_tree(); tmax = 3.0)
     @test read(path, String) == "((4:0.5,5:0.5):1.5,6:2):1;"
     rm(path)
+end
+
+@testset "panels.csv describes 24 panels over 20 distinct trees" begin
+    @test isfile(joinpath(NWK_DIR, "panels.csv"))
+    lines = readlines(joinpath(NWK_DIR, "panels.csv"))
+    @test lines[1] == "figure,model,d,sim_index,n_tips,N_pop,sampling_fraction," *
+                      "t_end,root_edge,median_leaf_depth,repeated,newick_file,highlight_file"
+    @test length(lines) == 25                       # header + 24 panels
+    rows = panel_rows()
+    @test length(unique(r[1] for r in rows)) == 4   # four figures
+    @test length(unique(r[12] for r in rows)) == 20 # det d=0.9 repeats its d=0 file
+    @test count(r -> r[11] == "true", rows) == 4    # one repeated panel per figure
+    for r in rows
+        @test isfile(joinpath(NWK_DIR, r[12]))
+    end
+end
+
+@testset "every exported tree is structurally sound" begin
+    for r in panel_rows()
+        n_tips = parse(Int, r[5])
+        s      = read(joinpath(NWK_DIR, r[12]), String)
+
+        @test endswith(s, ";")
+        # collapsed => strictly binary => n_tips - 1 internal nodes
+        @test count(==('('), s) == n_tips - 1
+        @test count(==(')'), s) == n_tips - 1
+        @test count(==(','), s) == n_tips - 1
+
+        labels = [m.captures[1] for m in eachmatch(r"(?:^|[(,])(\d+):", s)]
+        @test length(labels) == n_tips
+        @test length(unique(labels)) == n_tips
+    end
+end
+
+@testset "highlight ids are a sample of the full tree's tips" begin
+    for r in panel_rows()
+        r[1] == "full_N1000" || continue
+        @test !isempty(r[13])
+        hl   = readlines(joinpath(NWK_DIR, r[13]))
+        s    = read(joinpath(NWK_DIR, r[12]), String)
+        tips = Set(m.captures[1] for m in eachmatch(r"(?:^|[(,])(\d+):", s))
+        @test length(hl) == (r[2] == "deterministic" ? 102 : 100)
+        @test all(id -> id in tips, hl)
+    end
 end
 
 end
