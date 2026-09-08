@@ -4,6 +4,9 @@ data/
 # Local-only theory notes
 theory/
 
+# Local-only literature (copyrighted PDFs + extracted notes)
+literature/
+
 # Local-only project notes for Claude Code
 CLAUDE.md
 .claude
