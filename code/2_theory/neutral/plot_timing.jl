@@ -14,6 +14,8 @@ using Random
 
 include(joinpath(HELPERS, "types.jl"))
 include(joinpath(HELPERS, "plotting_functions.jl"))
+include(joinpath(HELPERS, "divisiontimes.jl"))
+include(joinpath(HELPERS, "timing_panels.jl"))
 
 # ── Parameters ────────────────────────────────────────────────────────────────
 
@@ -28,25 +30,21 @@ const OUT = joinpath(FIGURES, "2_theory", "neutral")
 
 xs = range(0.0, 6.0; length = 400)
 
-# ── Dirac (point-mass) rendering ──────────────────────────────────────────────
-#
-# The deterministic model draws its waiting times from Dirac(1/b), which has no
-# density to plot: pdf() is 0 everywhere except a non-integrable spike at 1/b.
-# Both rows therefore show *mass* rather than density, drawn as a stem with an
-# arrowhead — the usual convention for δ(t − t₀).
-
-function spike!(ax, t0, h; color, linewidth, linestyle = :solid, markersize = 16)
-    lines!(ax, [t0, t0], [0.0, h]; color, linewidth, linestyle)
-    scatter!(ax, [t0], [h]; color, marker = :utriangle, markersize)
-end
-
-commas(n::Integer) = replace(string(n), r"(?<=[0-9])(?=([0-9]{3})+$)" => ",")
+# Panel rendering (spike!, commas, the three-law overlay, the legend swatches)
+# lives in HELPERS/timing_panels.jl, shared with plot_timing_combined.jl.
 
 # ── Figure factory ────────────────────────────────────────────────────────────
 #
 # Produces a two-row timing figure:
-#   Top row    — theoretical PDFs for birth (and death for d > 0)
-#   Bottom row — empirical inter-division times from simulation trees
+#   Top row    — theoretical PDFs for birth (and death for d > 0), i.e. the
+#                clocks the simulation was *given*
+#   Bottom row — empirical inter-division times from simulation trees, against
+#                all three theoretical laws (see theory/divisiontimes.md):
+#                  f_b       the input division clock            black dashed
+#                  g/p_div   Effect 1 — competing death clock    grey dash-dot
+#                  p_obs     Effects 1+2 — plus the census tilt  firebrick solid
+#                Only p_obs should track the histogram; the gap between the
+#                three is the point of the row.
 #
 # dist_birth(d)  : returns the birth distribution for a given d
 # dist_death(d)  : returns the death distribution (only called for d > 0)
@@ -88,6 +86,11 @@ function make_timing_figure(;
 
     for (ci, d) in enumerate(d_values)
         bd = dist_birth(d)
+
+        # The two derived laws. Solving Euler–Lotka is a quadrature plus a
+        # bisection, so it costs well under a second per column — negligible
+        # beside deserializing the trees below.
+        law = predict_observed_lifetimes(bd, d > 0.0 ? dist_death(d) : nothing)
 
         # Row 1: theoretical ─────────────────────────────────────────────────
         ax_t = Axis(fig[2, ci];
@@ -150,41 +153,9 @@ function make_timing_figure(;
         end
 
         if dirac
-            # Every measured inter-division time should be exactly 1/b; a
-            # histogram of one repeated value has no width, so plot the mass at
-            # the measured value and check the degeneracy rather than assume it.
-            lo, hi = extrema(lifetimes)
-            isapprox(lo, hi; atol = 1e-9) || error(
-                "deterministic tree has non-constant inter-division times: " *
-                "extrema = ($lo, $hi) — is this really the Dirac model?")
-            t_obs = (lo + hi) / 2
-
-            xlims!(ax_e, extrema(xs)...)
-            ylims!(ax_e, 0.0, 1.3)
-            # Wide translucent stem for the measurement, in place of the
-            # histogram bars the other models get; theory dashed on top.
-            spike!(ax_e, t_obs, 1.0;
-                   color = (COL_DIV, 0.45), linewidth = 10.0, markersize = 20)
-            spike!(ax_e, bd.value, 1.0; color = :black, linewidth = 2.0,
-                   linestyle = :dash, markersize = 9)
-
-            text!(ax_e, 0.97, 0.95;
-                text     = "all $(commas(length(lifetimes))) inter-division\n" *
-                           "times exactly t = $(t_obs)",
-                align    = (:right, :top), space = :relative,
-                fontsize = FS_ANNOT, color = :grey40)
+            draw_lifetime_spike_panel!(ax_e, lifetimes, bd, law, xs)
         else
-            hist!(ax_e, lifetimes; bins = 80, normalization = :pdf,
-                  color = (COL_DIV, 0.45), strokewidth = 0.6, strokecolor = COL_DIV)
-            lines!(ax_e, collect(xs), pdf.(bd, xs);
-                   color = :black, linewidth = 2.5, linestyle = :dash)
-        end
-
-        if d > 0.0
-            text!(ax_e, 0.97, 0.95;
-                text     = "death times not\nobservable (pruned)",
-                align    = (:right, :top), space = :relative,
-                fontsize = FS_ANNOT, color = COL_DEATH)
+            draw_lifetime_panel!(ax_e, lifetimes, bd, law, xs)
         end
     end
 
@@ -195,30 +166,23 @@ function make_timing_figure(;
     rowgap!(fig.layout, 2, 14.0)
     rowgap!(fig.layout, 3, 2.0)
 
-    # A vertical stem in the swatch for the point-mass panels, a horizontal
-    # line/patch for the density panels — matching what each row actually draws.
-    stem_swatch(; kwargs...) =
-        LineElement(; points = Point2f[(0.5, 0.0), (0.5, 1.0)], kwargs...)
-
     leg_elems, leg_labels = if dirac
         (LegendElement[
              stem_swatch(color = COL_DIV, linewidth = 4.0),
              stem_swatch(color = (COL_DIV, 0.45), linewidth = 10.0),
-             stem_swatch(color = :black,  linewidth = 2.0, linestyle = :dash),
+             stem_swatch(color = COL_FB,  linewidth = 2.0, linestyle = :dash),
          ],
          [label_div,
           "empirical inter-division times",
-          "theoretical division time"])
+          "f_b = g/p_div = p_obs  (all three coincide)"])
     else
+        lt_elems, lt_labels = lifetime_legend_entries()
         (LegendElement[
              LineElement(color = COL_DIV,   linewidth = 3.0),
              LineElement(color = COL_DEATH, linewidth = 3.0, linestyle = :dash),
-             PolyElement(color = (COL_DIV, 0.45)),
-             LineElement(color = :black,    linewidth = 2.5, linestyle = :dash),
+             lt_elems...,
          ],
-         [label_div, label_death,
-          "empirical inter-division times",
-          "theoretical division PDF"])
+         [label_div, label_death, lt_labels...])
     end
 
     Legend(fig[5, 1:ncols], leg_elems, leg_labels;
