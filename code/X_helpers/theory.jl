@@ -92,3 +92,27 @@ function predict_scMBdist_deterministic(j_axis, avgen_det, m, N)
     D = Poisson(m * avgen_det)
     return Float64[N * pdf(D, j) for j in j_axis]
 end
+
+# ── Expected leaf depth E[L], per theory/inference.md ────────────────────────
+#
+# Dispatches on the Gamma shape parameter of the division-time distribution.
+# For neutral simulations, `gamma_shape ∈ {Inf (deterministic), 5.0 (Gamma k=5),
+# 1.0 (Markov)}`. Selection sims share the same convention.
+"""
+    E_L_theory(gamma_shape::Float64, b::Float64, d::Float64, N::Int) -> Float64
+
+Expected leaf (root-to-tip) depth under Gamma(gamma_shape) division timing,
+birth rate b, death rate d, target population N. Deterministic and Markov
+limits are exact; the Gamma case uses the interpolation
+`E[L]_det * (1 + 1/sqrt(gamma_shape))` from theory/inference.md.
+"""
+function E_L_theory(gamma_shape::Float64, b::Float64, d::Float64, N::Int)
+    if isinf(gamma_shape)
+        return b * log(N) / (b - d)                 # deterministic (d must be 0 for these sims)
+    elseif gamma_shape == 1.0
+        return predict_averageGeneration(b, d, N)   # Markov
+    else
+        E_L_det = b * log(N) / (b - d)
+        return E_L_det * (1 + 1 / sqrt(gamma_shape))  # Gamma
+    end
+end

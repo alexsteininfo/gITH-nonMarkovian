@@ -1,3 +1,6 @@
+using Serialization
+using Statistics
+
 # Shared plotting constants and computation helpers for MutationLoadDynamics.jl.
 # Include via: include(joinpath(HELPERS, "plotting_functions.jl"))
 # Requires: using Statistics in the calling script.
@@ -71,4 +74,39 @@ function aggregate_actual_sfs(all_sfs::Vector{Vector{Int}})
     sstd    = vec(std(mat;  dims = 2))
     ssingle = Float64.(all_sfs[1])
     return smean, sstd, ssingle
+end
+
+# ── Inference statistic aggregation ────────────────────────────────────────────
+
+"""
+    aggregate_stat(files, key; extract = identity, reducer = median) -> NamedTuple
+
+`files` is a Vector of paths to `Vector{Union{Nothing,Dict}}` `.jls`. For each
+file it deserializes, applies `extract(dict) -> Float64` per sim (nothing sims
+are dropped), and reduces via `reducer`. Returns a NamedTuple with `:x` (file
+stem), `:reduced` (Vector{Float64}), `:by_sim` (Vector{Vector{Float64}}).
+`key` is unused by the helper itself but stored under `:key` for the caller's
+labelling.
+"""
+function aggregate_stat(files; extract, reducer = median, key = nothing)
+    xs, red, by_sim = String[], Float64[], Vector{Vector{Float64}}()
+    for f in files
+        stem = splitext(basename(f))[1]
+        data = deserialize(f)
+        vals = Float64[]
+        for d in data
+            isnothing(d) && continue
+            try
+                v = extract(d)
+                v isa Number || continue
+                isfinite(v) && push!(vals, v)
+            catch
+                # silently skip; caller uses length(:by_sim[i]) to detect
+            end
+        end
+        push!(xs, stem)
+        push!(red, isempty(vals) ? NaN : reducer(vals))
+        push!(by_sim, vals)
+    end
+    return (x = xs, reduced = red, by_sim = by_sim, key = key)
 end
