@@ -75,6 +75,7 @@ function main()
         isdir(subdir) || continue
         for f in sort(readdir(subdir))
             endswith(f, ".jls") || continue
+            shard_should_skip(f) && continue
             push!(shards, joinpath(subdir, f))
         end
     end

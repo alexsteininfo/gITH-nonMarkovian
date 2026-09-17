@@ -73,6 +73,7 @@ function main()
         isdir(subdir) || continue
         for f in sort(readdir(subdir))
             endswith(f, ".jls") || continue
+            shard_should_skip(f) && continue
             # Skip superseded deterministic N=1000 and N=10000 shards (pre-2025
             # runs that lack a consistent k/gamma_shape; the canonical shards are
             # N1024 and N16384, which follow the standard naming convention).

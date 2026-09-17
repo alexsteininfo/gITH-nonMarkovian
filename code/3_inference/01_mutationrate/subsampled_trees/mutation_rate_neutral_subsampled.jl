@@ -75,6 +75,7 @@ function main()
         isdir(subdir) || continue
         for f in sort(readdir(subdir))
             endswith(f, ".jls") || continue
+            shard_should_skip(f, true) && continue
             # Defensive: skip if the superseded deterministic N=1000/N=10000
             # source shards somehow produced subsampled counterparts.
             startswith(f, "neutral_deterministic_N1000_")  && continue

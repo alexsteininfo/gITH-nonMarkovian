@@ -38,13 +38,20 @@ read_medicc2_tree <- function(medicc2_dir) {
     ape::read.tree(path)
 }
 
-read_truth_events <- function(truth_dir) {
+# MEDICC2 only tracks chr1..chr22, but the simulation truth includes chrX on
+# both haplotypes (~4-5% of all events). Any statistic that will be compared
+# against MEDICC2 output has to drop chrX first, otherwise truth-side counts
+# are systematically inflated. Default is to drop chrX; pass keep_chrX = TRUE
+# when analysing the truth in its own right.
+read_truth_events <- function(truth_dir, keep_chrX = FALSE) {
     path <- file.path(truth_dir, "sim1_truth_events.tsv")
-    read_tsv(path, col_types = cols(
+    ev <- read_tsv(path, col_types = cols(
         node_id = "i", name = "c", order = "i", type = "c",
         chrom = "c", haplotype = "i", start = "d", stop = "d",
         delta = "i", scale = "c", mode = "c"
     ))
+    if (!keep_chrX) ev <- ev %>% filter(chrom != "chrX")
+    ev
 }
 
 read_medicc2_events <- function(medicc2_dir) {
@@ -55,12 +62,19 @@ read_medicc2_events <- function(medicc2_dir) {
     ))
 }
 
-read_truth_profiles <- function(truth_dir) {
+# Same chrX story as read_truth_events: MEDICC2 profiles only cover
+# chr1..chr22, so callers that project truth onto MEDICC2's grid should drop
+# chrX from the truth. (Projections via `foverlaps` against the MEDICC2 bin
+# grid drop chrX by accident, but a caller iterating over truth rows directly
+# would be off by ~5% otherwise.) Pass keep_chrX = TRUE for truth-only work.
+read_truth_profiles <- function(truth_dir, keep_chrX = FALSE) {
     path <- file.path(truth_dir, "sim1_truth_profiles.tsv")
-    read_tsv(path, col_types = cols(
+    prof <- read_tsv(path, col_types = cols(
         node_id = "i", name = "c", chrom = "c",
         haplotype = "i", start = "d", stop = "d", cn = "i"
     ))
+    if (!keep_chrX) prof <- prof %>% filter(chrom != "chrX")
+    prof
 }
 
 read_medicc2_profiles <- function(medicc2_dir) {

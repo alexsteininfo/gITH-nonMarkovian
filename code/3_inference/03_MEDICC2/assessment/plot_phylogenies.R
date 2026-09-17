@@ -13,8 +13,8 @@
 #   data/MEDICC2/treeinference/<sim_rel>/sim1_final_tree.new
 #
 # Outputs (default outdir = figures/3_inference/03_MEDICC2/phylogenies/):
-#   <outdir>/phylogenies_paired__<slug>.png
-#   <outdir>/phylogenies_tanglegram__<slug>.png
+#   <outdir>/paired/phylogenies_paired__<slug>.png
+#   <outdir>/tanglegram/phylogenies_tanglegram__<slug>.png
 
 suppressPackageStartupMessages({
     library(dplyr); library(ape); library(ggtree); library(ggplot2); library(cowplot)
@@ -50,7 +50,8 @@ OUT_DIR <- if (is.null(outdir_arg)) {
 } else {
     file.path(ROOT, outdir_arg)
 }
-dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(OUT_DIR, "paired"),    showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(OUT_DIR, "tanglegram"), showWarnings = FALSE, recursive = TRUE)
 
 # ---------------------------------------------------------------------------
 # Step 2: Load trees, collapse truth, drop `diploid` from MEDICC2 for the visual
@@ -127,7 +128,7 @@ shared_legend <- cowplot::get_legend(legend_plot)
 paired_panels <- cowplot::plot_grid(p_truth, p_med, ncol = 2, align = "h")
 paired <- cowplot::plot_grid(paired_panels, shared_legend,
                              ncol = 1, rel_heights = c(1, 0.06))
-out_paired <- file.path(OUT_DIR, paste0("phylogenies_paired__", sim_slug(sim_rel), ".png"))
+out_paired <- file.path(OUT_DIR, "paired", paste0("phylogenies_paired__", sim_slug(sim_rel), ".png"))
 ggsave(out_paired, paired, width = 12, height = 10, dpi = 120)
 message("wrote: ", out_paired)
 
@@ -139,7 +140,7 @@ message("wrote: ", out_paired)
 # Uses the full medicc2_tree (without diploid already dropped above for visual).
 assoc <- cbind(common, common)
 
-out_tangle <- file.path(OUT_DIR, paste0("phylogenies_tanglegram__", sim_slug(sim_rel), ".png"))
+out_tangle <- file.path(OUT_DIR, "tanglegram", paste0("phylogenies_tanglegram__", sim_slug(sim_rel), ".png"))
 png(out_tangle, width = 12 * 120, height = 10 * 120, res = 120)
 op <- par(mar = c(2, 1, 3, 1))
 # Pass the rotated MEDICC2 tree (same object the paired plot uses). Because

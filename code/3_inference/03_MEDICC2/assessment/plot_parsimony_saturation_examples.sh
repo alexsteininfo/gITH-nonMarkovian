@@ -4,7 +4,8 @@
 # Render parsimony-saturation diagnostics + topology-metric figures for the
 # same 8 scenarios used by the CN-profile and phylogeny galleries.
 #
-# Output: figures/3_inference/03_MEDICC2/parsimony_saturation/{saturation,topology_metrics}__<slug>.png
+# Output: figures/3_inference/03_MEDICC2/parsimony_saturation/edgelenghts/saturation__<slug>.png
+#         figures/3_inference/03_MEDICC2/parsimony_saturation/cophenetic/topology_metrics__<slug>.png
 #
 # Usage:
 #   bash code/3_inference/03_MEDICC2/assessment/plot_parsimony_saturation_examples.sh
@@ -13,7 +14,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/code/3_inference/03_MEDICC2/assessment"
-OUTDIR="figures/3_inference/03_MEDICC2/parsimony_saturation"  # resolved against REPO_ROOT inside the R scripts
+OUTDIR_EDGELENGHTS="figures/3_inference/03_MEDICC2/parsimony_saturation/edgelenghts"  # resolved against REPO_ROOT
+OUTDIR_COPHENETIC="figures/3_inference/03_MEDICC2/parsimony_saturation/cophenetic"   # resolved against REPO_ROOT
 
 SIMS=(
     "neutral/deterministic/neutral_deterministic_N1024_n102/sim1"
@@ -29,6 +31,6 @@ SIMS=(
 cd "$REPO_ROOT"
 for sim in "${SIMS[@]}"; do
     echo "=== $sim ==="
-    micromamba run -n R Rscript "${SCRIPT_DIR}/plot_saturation.R"       --sim "$sim" --outdir "$OUTDIR"
-    micromamba run -n R Rscript "${SCRIPT_DIR}/plot_topology_metrics.R" --sim "$sim" --outdir "$OUTDIR"
+    micromamba run -n R Rscript "${SCRIPT_DIR}/plot_saturation.R"       --sim "$sim" --outdir "$OUTDIR_EDGELENGHTS"
+    micromamba run -n R Rscript "${SCRIPT_DIR}/plot_topology_metrics.R" --sim "$sim" --outdir "$OUTDIR_COPHENETIC"
 done

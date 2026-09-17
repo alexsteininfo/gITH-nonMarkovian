@@ -45,7 +45,7 @@ message("sim: ", sim_rel)
 TRUTH_DIR   <- file.path(ROOT, "data", "CN_subsampled", dirname(sim_rel))
 MEDICC2_DIR <- file.path(ROOT, "data", "MEDICC2", "treeinference", sim_rel)
 OUT_DIR <- if (is.null(outdir_arg)) {
-    file.path(ROOT, "figures", "3_inference", "03_MEDICC2", "parsimony_saturation")
+    file.path(ROOT, "figures", "3_inference", "03_MEDICC2", "parsimony_saturation", "cophenetic")
 } else if (startsWith(outdir_arg, "/")) {
     outdir_arg
 } else {

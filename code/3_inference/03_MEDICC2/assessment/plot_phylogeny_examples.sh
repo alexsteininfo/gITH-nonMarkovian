@@ -7,7 +7,8 @@
 # death-rate variation, a larger-N run, and one example from each selection
 # scenario.
 #
-# Output: figures/3_inference/03_MEDICC2/phylogenies/{phylogenies_paired,phylogenies_tanglegram}__<slug>.png
+# Output: figures/3_inference/03_MEDICC2/phylogenies/paired/phylogenies_paired__<slug>.png
+#         figures/3_inference/03_MEDICC2/phylogenies/tanglegram/phylogenies_tanglegram__<slug>.png
 #
 # Usage:
 #   bash code/3_inference/03_MEDICC2/assessment/plot_phylogeny_examples.sh

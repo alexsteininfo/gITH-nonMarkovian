@@ -16,7 +16,7 @@
 # Definitions match plot_saturation.R and plot_topology_metrics.R exactly, so
 # per-sim aggregates equal what the per-sim panels show.
 #
-# Cache: data/MEDICC/benchmark/aggregate_metrics.csv (created if missing).
+# Cache: data/MEDICC2/benchmark/aggregate_metrics.csv (created if missing).
 # Idempotent: sims already present in the CSV are skipped unless --force.
 # Backfill: if the CSV exists but lacks any of the metric columns above (e.g.
 # a new column was added), rows missing that value are recomputed in place
@@ -44,7 +44,7 @@ source(file.path(ROOT, "code", "X_helpers", "medicc2_io.R"))
 user_args <- commandArgs(trailingOnly = TRUE)
 force <- "--force" %in% user_args
 
-CSV_PATH <- file.path(ROOT, "data", "MEDICC", "benchmark", "aggregate_metrics.csv")
+CSV_PATH <- file.path(ROOT, "data", "MEDICC2", "benchmark", "aggregate_metrics.csv")
 dir.create(dirname(CSV_PATH), showWarnings = FALSE, recursive = TRUE)
 
 # ---------------------------------------------------------------------------

@@ -39,7 +39,7 @@ ROOT <- normalizePath(file.path(dirname(this_file), "..", "..", "..", ".."))
 
 source(file.path(ROOT, "code", "X_helpers", "plotting_functions.R"))
 
-CSV_PATH <- file.path(ROOT, "data", "MEDICC", "benchmark", "aggregate_metrics.csv")
+CSV_PATH <- file.path(ROOT, "data", "MEDICC2", "benchmark", "aggregate_metrics.csv")
 OUT_DIR  <- file.path(ROOT, "figures", "3_inference", "03_MEDICC2",
                       "parsimony_saturation", "aggregate")
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
